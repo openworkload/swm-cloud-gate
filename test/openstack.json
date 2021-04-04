@@ -1,0 +1,55 @@
+[
+  {
+    "provider": "openstack",
+    "requests": {
+      "images": [
+        {"id": "i1", "name": "image1", "status": "creating"},
+        {"id": "i2", "name": "cirros", "status": "created"}
+      ],
+      "sizes": [
+        {"id": "p1", "name": "flavor1", "vcpus": 2, "ram": 1073741824, "disk": 12884901888, "bandwidth": 500, "swap": 0, "ephemeral_disk": 0, "price": 3},
+        {"id": "p2", "name": "flavor2", "vcpus": 8, "ram": 2147483648, "disk": 154618822656, "bandwidth": 100, "swap": 100, "ephemeral_disk": 0, "price": 8}
+      ],
+      "stacks": [
+        {
+          "id": "s1",
+          "stack_name": "stack1",
+          "creation_time": "2021-01-02T15:18:39",
+          "updated_time": "2021-01-02T16:18:39",
+          "stack_status": "CREATE_IN_PROGRESS",
+          "description": "Test stack 1",
+          "outputs": [
+            {"output_value": ["10.0.0.101"],
+             "output_key": "compute_instances_private_ips",
+             "description": "IP addresses of compute_instances in private network"},
+            {"output_value": "10.0.0.108",
+             "output_key": "master_instance_private_ip",
+             "description": "IP address of master_instance in private network"},
+            {"output_value": "172.28.128.153",
+             "output_key": "master_instance_public_ip",
+             "description": "IP address of master_instance in public network"}
+          ]
+        },
+        {
+          "id": "s2",
+          "stack_name": "stack2",
+          "creation_time": "2020-11-12T10:00:00",
+          "updated_time": "2021-01-02T11:18:39",
+          "stack_status": "CREATE_COMPLETE",
+          "description": "Test stack 2",
+          "outputs": [
+            {"output_value": ["10.0.0.102"],
+             "output_key": "compute_instances_private_ips",
+             "description": "IP addresses of compute_instances in private network"},
+            {"output_value": "10.0.0.101",
+             "output_key": "master_instance_private_ip",
+             "description": "IP address of master_instance in private network"},
+            {"output_value": "172.28.128.154",
+             "output_key": "master_instance_public_ip",
+             "description": "IP address of master_instance in public network"}
+          ]
+        }
+      ]
+    }
+  }
+]

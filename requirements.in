@@ -1,0 +1,12 @@
+apache-libcloud
+attrs>=19.0.0
+black
+fastapi>=0.60
+flake8
+isort
+pip-tools
+pydantic
+jinja2
+
+# Fix unsutisfiled dependency on dataclasses 0.8 issue
+dataclasses==0.6

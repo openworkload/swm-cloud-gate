@@ -1,0 +1,6 @@
+* pass credentials via POST
+* create partition using already uploaded image
+* imlpement getting partition info (which also can be used to get if partition exists), it also should include IPs.
+* run finalize script on each node of the partition
+* ensure partition is ready in SWM after creation (job can be started)
+* implement parition removal
