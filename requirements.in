@@ -9,5 +9,5 @@ pydantic
 jinja2
 uvicorn
 
-# Fix unsutisfiled dependency on dataclasses 0.8 issue
+# Fix unsatisfied dependency on dataclasses 0.8 issue
 dataclasses==0.6

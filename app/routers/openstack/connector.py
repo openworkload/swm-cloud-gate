@@ -7,7 +7,6 @@ import uuid
 
 import jinja2
 import libcloud.security
-
 from fastapi import HTTPException
 from libcloud.common.openstack import OpenStackResponse
 from libcloud.compute.base import NodeImage
@@ -17,15 +16,15 @@ from libcloud.compute.types import Provider
 
 from ..baseconnector import BaseConnector
 
-LOG = logging.getLogger('swm')
-STACK_TEMLPATE_FILE = 'app/routers/openstack/templates/heat_stack.json'
-SERVICE_NAMES = {'compute': 'nova', 'orchestration': 'heat', 'rating' : 'cloudkitty'}
+LOG = logging.getLogger("swm")
+STACK_TEMLPATE_FILE = "app/routers/openstack/templates/heat_stack.json"
+SERVICE_NAMES = {"compute": "nova", "orchestration": "heat", "rating": "cloudkitty"}
 
 
 class OpenStackConnector(BaseConnector):
     def __init__(self, username: str = None, password: str = None, service: str = None):
         self._init_driver(username, password, service)
-        super().__init__('openstack')
+        super().__init__("openstack")
 
     def reinitialize(self, username: str, password: str, service: str) -> None:
         self._init_driver(username, password, service)
@@ -37,39 +36,42 @@ class OpenStackConnector(BaseConnector):
             self._driver = OpenStack(
                 username,
                 password,
-                ex_tenant_name='demo1',
-                ex_domain_name='Default',
+                ex_tenant_name="demo1",
+                ex_domain_name="Default",
                 ex_force_service_type=service,
                 ex_force_service_name=SERVICE_NAMES[service],
-                ex_force_auth_url='http://172.28.128.2:5000',
-                ex_force_auth_version='2.0_password',
+                ex_force_auth_url="http://172.28.128.2:5000",
+                ex_force_auth_version="2.0_password",
             )
 
     def list_sizes(self):
-        if 'sizes' in self._test_responses:
+        if "sizes" in self._test_responses:
             node_sizes = []
             for it in self._test_responses["sizes"]:
-                node_sizes.append(OpenStackNodeSize(id=it['id'],
-                                                    name=it['name'],
-                                                    bandwidth=it['bandwidth'],
-                                                    ram=it['ram'],
-                                                    disk=it['disk'],
-                                                    price=it['price'],
-                                                    vcpus=it['vcpus'],
-                                                    ephemeral_disk=it['ephemeral_disk'],
-                                                    swap=it['swap'],
-                                                    driver=self._driver))
+                node_sizes.append(
+                    OpenStackNodeSize(
+                        id=it["id"],
+                        name=it["name"],
+                        bandwidth=it["bandwidth"],
+                        ram=it["ram"],
+                        disk=it["disk"],
+                        price=it["price"],
+                        vcpus=it["vcpus"],
+                        ephemeral_disk=it["ephemeral_disk"],
+                        swap=it["swap"],
+                        driver=self._driver,
+                    )
+                )
             return node_sizes
         return self._driver.list_sizes()
 
     def list_images(self):
-        if 'images' in self._test_responses:
+        if "images" in self._test_responses:
             node_images = []
             for it in self._test_responses["images"]:
-                node_images.append(NodeImage(id=it['id'],
-                                             name=it['name'],
-                                             extra={'status': it['status']},
-                                             driver=self._driver))
+                node_images.append(
+                    NodeImage(id=it["id"], name=it["name"], extra={"status": it["status"]}, driver=self._driver)
+                )
             return node_images
         return self._driver.list_images()
 
@@ -88,7 +90,7 @@ class OpenStackConnector(BaseConnector):
         key_name: str,
         count: str,
     ) -> str:
-        template_loader = jinja2.FileSystemLoader(searchpath='./')
+        template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader, autoescape=True)
         template = template_env.get_template(STACK_TEMLPATE_FILE)
         json_str = template.render(
@@ -107,7 +109,7 @@ class OpenStackConnector(BaseConnector):
         data: typing.Any,
         expect: typing.List[int],
     ) -> libcloud.common.openstack.OpenStackResponse:
-        LOG.debug(f'[REQUEST] {method} {action} {data}')
+        LOG.debug(f"[REQUEST] {method} {action} {data}")
         response = None
         try:
             response = self._driver.connection.request(action=action, data=data, method=method)
@@ -118,19 +120,19 @@ class OpenStackConnector(BaseConnector):
         result = response.parse_body()
         status = response.status
         if status not in expect:
-            LOG.info(f'Unexpected response status: {status}')
+            LOG.info(f"Unexpected response status: {status}")
             return None
-        LOG.debug(f'[RESPONSE]: {result}')
+        LOG.debug(f"[RESPONSE]: {result}")
         return result
 
     def list_stacks(self) -> typing.List[typing.Dict[str, typing.Any]]:
-        if 'stacks' in self._test_responses:
+        if "stacks" in self._test_responses:
             stacks = []
             for it in self._test_responses["stacks"]:
                 stacks.append(it)
             return stacks
-        result = self._request(action='stacks', method='GET', data={}, expect=[http.client.OK])
-        return result.get('stacks', []) if result else []
+        result = self._request(action="stacks", method="GET", data={}, expect=[http.client.OK])
+        return result.get("stacks", []) if result else []
 
     def create_stack(
         self,
@@ -152,31 +154,31 @@ class OpenStackConnector(BaseConnector):
                 "stack_status": "created",
                 "description": "test stack",
             }
-            self._test_responses.setdefault('stacks', []).append(new_stack)
-            return {"id":id, "links":[]}
+            self._test_responses.setdefault("stacks", []).append(new_stack)
+            return {"id": id, "links": []}
         template = self._get_stack_template(stack_name, image_name, flavor_name, key_name, count)
-        result = self._request(action='stacks', method='POST', data=template, expect=[http.client.CREATED])
-        return result.get('stack', {}) if result else {}
+        result = self._request(action="stacks", method="POST", data=template, expect=[http.client.CREATED])
+        return result.get("stack", {}) if result else {}
 
     def get_stack(self, stack_id: str) -> typing.Dict[str, typing.Any]:
-        if 'stacks' in self._test_responses:
+        if "stacks" in self._test_responses:
             for it in self.list_stacks():
-                if it['id'] == stack_id:
+                if it["id"] == stack_id:
                     return it
             return {}
-        stack_info = self._request(action=f'stacks/{stack_id}', method='GET', data={}, expect=[http.client.OK])
-        return stack_info.get('stack', None) if stack_info else {}
+        stack_info = self._request(action=f"stacks/{stack_id}", method="GET", data={}, expect=[http.client.OK])
+        return stack_info.get("stack", None) if stack_info else {}
 
     def delete_stack(self, stack_id: str) -> str:
         stack = self.get_stack(stack_id)
         if not stack:
-            return f'Stack with id {stack_id} not found'
+            return f"Stack with id {stack_id} not found"
         if self._test_responses:
-            for it in self._test_responses['stacks']:
-                if it['id'] == stack_id:
-                    self._test_responses['stacks'].remove(it)
+            for it in self._test_responses["stacks"]:
+                if it["id"] == stack_id:
+                    self._test_responses["stacks"].remove(it)
                     break
         else:
             action = f'stacks/{stack["stack_name"]}/{stack_id}'
-            self._request(action=action, method='DELETE', data={}, expect=[http.client.NO_CONTENT])
-        return 'Deletion started'
+            self._request(action=action, method="DELETE", data={}, expect=[http.client.NO_CONTENT])
+        return "Deletion started"
