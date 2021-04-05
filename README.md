@@ -1,7 +1,7 @@
 # swm-cloud-gate
 
 SkyPort gate that provides cloud integration.
-Part of Sky Workload Manager.
+Part of Sky Workload Manager project.
 
 # Requirements
   * python >= 3.7
@@ -12,16 +12,9 @@ Part of Sky Workload Manager.
   * make format
 
 # Run the gate
-  * Run swm dev container (make cr)
-  * source .venv/bin/activate
-  * ./run.py
+  * Run swm-core dev container (make cr)
+  * ./run.sh
 
 # Run the gate in test mode
-  * Run swm dev container (make cr)
+  * Run swm-core dev container (make cr)
   * ./run-mocked.py
-
-# References:
-  * https://libcloud.readthedocs.io/en/stable/compute/examples.html
-  * https://docs.openstack.org/api-ref/orchestration/v1/index.html
-  * https://docs.python.org/3.3/library/http.client.html
-
