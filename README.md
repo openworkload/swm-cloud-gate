@@ -4,7 +4,7 @@ SkyPort gate that provides cloud integration.
 Part of Sky Workload Manager project.
 
 # Requirements
-  * python >= 3.7
+  * python >= 3.9
 
 # Setup and development commands
   * make prepare-venv
