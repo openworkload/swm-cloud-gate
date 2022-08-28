@@ -1,4 +1,4 @@
-apache-libcloud
+apache-libcloud>=3.6.0
 attrs>=19.0.0
 black
 fastapi>=0.60

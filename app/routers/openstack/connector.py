@@ -20,7 +20,6 @@ LOG = logging.getLogger("swm")
 STACK_TEMLPATE_FILE = "app/routers/openstack/templates/heat_stack.json"
 SERVICE_NAMES = {"compute": "nova", "orchestration": "heat", "rating": "cloudkitty"}
 
-
 class OpenStackConnector(BaseConnector):
     def __init__(self, username: str = None, password: str = None, service: str = None):
         self._init_driver(username, password, service)
@@ -30,9 +29,12 @@ class OpenStackConnector(BaseConnector):
         self._init_driver(username, password, service)
 
     def _init_driver(self, username: str, password: str, service: str) -> None:
+        # See also https://libcloud.readthedocs.io/en/stable/compute/drivers/openstack.html
         if username and password and service:
             libcloud.security.VERIFY_SSL_CERT = False  # FIXME: use SSL connection
             OpenStack = get_driver(Provider.OPENSTACK)
+            url = "http://172.28.128.254:5000"
+            LOG.info(f"Connect to OpenStack at {url}")
             self._driver = OpenStack(
                 username,
                 password,
@@ -40,8 +42,8 @@ class OpenStackConnector(BaseConnector):
                 ex_domain_name="Default",
                 ex_force_service_type=service,
                 ex_force_service_name=SERVICE_NAMES[service],
-                ex_force_auth_url="http://172.28.128.2:5000",
-                ex_force_auth_version="2.0_password",
+                ex_force_auth_url=url,
+                ex_force_auth_version="3.x_password",
             )
 
     def list_sizes(self):
@@ -63,7 +65,12 @@ class OpenStackConnector(BaseConnector):
                     )
                 )
             return node_sizes
-        return self._driver.list_sizes()
+        try:
+            sizes = self._driver.list_sizes()
+            return sizes
+        except Exception as e:
+            LOG.error(f"{e}")
+        return None
 
     def list_images(self):
         if "images" in self._test_responses:

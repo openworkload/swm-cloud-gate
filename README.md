@@ -1,7 +1,7 @@
 # swm-cloud-gate
 
-Sky Port gate that provides cloud integration.
-Part of [Open Workload](http://openworkload.org) project.
+This is a repository for Sky Port gate that provides cloud integration.
+Part of the [Open Workload](http://openworkload.org) project.
 
 # Requirements
   * python >= 3.9
