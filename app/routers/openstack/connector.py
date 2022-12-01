@@ -7,7 +7,6 @@ import uuid
 
 import jinja2
 import libcloud.security
-from fastapi import HTTPException
 from libcloud.common.openstack import OpenStackResponse
 from libcloud.compute.base import NodeImage
 from libcloud.compute.drivers.openstack import OpenStackNodeSize
@@ -19,6 +18,7 @@ from ..baseconnector import BaseConnector
 LOG = logging.getLogger("swm")
 STACK_TEMLPATE_FILE = "app/routers/openstack/templates/heat_stack.json"
 SERVICE_NAMES = {"compute": "nova", "orchestration": "heat", "rating": "cloudkitty"}
+
 
 class OpenStackConnector(BaseConnector):
     def __init__(self, username: str = None, password: str = None, service: str = None):
@@ -115,7 +115,7 @@ class OpenStackConnector(BaseConnector):
         method: str,
         data: typing.Any,
         expect: typing.List[int],
-    ) -> libcloud.common.openstack.OpenStackResponse:
+    ) -> OpenStackResponse:
         LOG.debug(f"[REQUEST] {method} {action} {data}")
         response = None
         try:

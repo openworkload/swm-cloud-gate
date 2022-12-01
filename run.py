@@ -17,7 +17,7 @@ def main():
         reload=False,
         log_level="debug",
         timeout_keep_alive=60,
-        ssl_version = ssl.PROTOCOL_TLS_SERVER,
+        ssl_version=ssl.PROTOCOL_TLS_SERVER,
         ssl_ca_certs=os.path.join(spool, "cluster", "cert.pem"),
         ssl_keyfile=os.path.join(spool, "node", "key.pem"),
         ssl_certfile=os.path.join(spool, "node", "cert.pem"),

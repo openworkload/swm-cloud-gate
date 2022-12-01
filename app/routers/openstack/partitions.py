@@ -5,7 +5,7 @@ import typing
 from fastapi import APIRouter, Header, HTTPException
 
 from .connector import OpenStackConnector
-from .models import convert_to_partition
+from .models import PartInfo, convert_to_partition
 
 CONNECTOR = OpenStackConnector()
 LOG = logging.getLogger("swm")

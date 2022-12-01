@@ -3,7 +3,7 @@ import typing
 from fastapi import APIRouter, Header
 
 from .connector import OpenStackConnector
-from .models import convert_to_flavor
+from .models import ImageInfo, convert_to_flavor
 
 CONNECTOR = OpenStackConnector()
 ROUTER = APIRouter()

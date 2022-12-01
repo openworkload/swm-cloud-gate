@@ -1,11 +1,10 @@
 import http
-import logging
 import typing
 
 from fastapi import APIRouter, Header, HTTPException
 
 from .connector import OpenStackConnector
-from .models import convert_to_image
+from .models import ImageInfo, convert_to_image
 
 CONNECTOR = OpenStackConnector()
 ROUTER = APIRouter()

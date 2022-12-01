@@ -11,7 +11,7 @@ prepare-venv:
 .PHONY: check
 check:
 	VENV_BIN=.venv/bin
-	if ! [[ -f "$${VENV_BIN}/black" ]]; then
+	if [ ! -f "$${VENV_BIN}/black" ]; then
 		make prepare-venv || true
 	fi
 	$${VENV_BIN}/flake8 --exclude .venv .
@@ -20,7 +20,7 @@ check:
 .PHONY: format
 format:
 	VENV_BIN=.venv/bin
-	if ! [[ -f "$${VENV_BIN}/black" ]]; then
+	if [ ! -f "$${VENV_BIN}/black" ]; then
 		make prepare-venv || true
 	fi
 	$${VENV_BIN}/isort --gitignore .
