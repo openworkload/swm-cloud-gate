@@ -7,11 +7,12 @@ from .connector import OpenStackConnector
 from .models import ImageInfo, convert_to_image
 
 CONNECTOR = OpenStackConnector()
+EMPTY_HEADER = Header(None)
 ROUTER = APIRouter()
 
 
 @ROUTER.get("/openstack/images/{id}")
-async def get_image_info(id: str, username: str = Header(None), password: str = Header(None)):
+async def get_image_info(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "compute")
     image = CONNECTOR.find_image(id)
     if not image:
@@ -23,7 +24,7 @@ async def get_image_info(id: str, username: str = Header(None), password: str = 
 
 
 @ROUTER.get("/openstack/images")
-async def list_images(username: str = Header(None), password: str = Header(None)):
+async def list_images(username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "compute")
     images_info: typing.List[ImageInfo] = []
     for image in CONNECTOR.list_images():

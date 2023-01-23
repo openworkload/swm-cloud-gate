@@ -3,6 +3,7 @@ attrs>=19.0.0
 black
 fastapi>=0.60
 flake8
+flake8-bugbear
 isort
 pip-tools
 pydantic

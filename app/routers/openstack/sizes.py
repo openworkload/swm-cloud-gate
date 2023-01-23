@@ -6,11 +6,12 @@ from .connector import OpenStackConnector
 from .models import ImageInfo, convert_to_flavor
 
 CONNECTOR = OpenStackConnector()
+EMPTY_HEADER = Header(None)
 ROUTER = APIRouter()
 
 
 @ROUTER.get("/openstack/flavors")
-async def list_flavors(username: str = Header(None), password: str = Header(None)):
+async def list_flavors(username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "compute")
     flavor_list: typing.List[ImageInfo] = []
     if sizes := CONNECTOR.list_sizes():

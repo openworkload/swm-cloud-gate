@@ -8,20 +8,21 @@ from .connector import OpenStackConnector
 from .models import PartInfo, convert_to_partition
 
 CONNECTOR = OpenStackConnector()
+EMPTY_HEADER = Header(None)
 LOG = logging.getLogger("swm")
 ROUTER = APIRouter()
 
 
 @ROUTER.post("/openstack/partitions")
 async def create_partition(
-    username: str = Header(None),
-    password: str = Header(None),
-    tenantname: str = Header(None),
-    partname: str = Header(None),
-    imagename: str = Header(None),
-    flavorname: str = Header(None),
-    keyname: str = Header(None),
-    count: str = Header(None),
+    username: str = EMPTY_HEADER,
+    password: str = EMPTY_HEADER,
+    tenantname: str = EMPTY_HEADER,
+    partname: str = EMPTY_HEADER,
+    imagename: str = EMPTY_HEADER,
+    flavorname: str = EMPTY_HEADER,
+    keyname: str = EMPTY_HEADER,
+    count: str = EMPTY_HEADER,
 ):
     CONNECTOR.reinitialize(username, password, "orchestration")
     result = CONNECTOR.create_stack(tenantname, partname, imagename, flavorname, keyname, count)
@@ -30,7 +31,7 @@ async def create_partition(
 
 
 @ROUTER.get("/openstack/partitions")
-async def list_partitions(username: str = Header(None), password: str = Header(None)):
+async def list_partitions(username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "orchestration")
     partitions: typing.List[PartInfo] = []
     for stack in CONNECTOR.list_stacks():
@@ -42,7 +43,7 @@ async def list_partitions(username: str = Header(None), password: str = Header(N
 
 
 @ROUTER.get("/openstack/partitions/{id}")
-async def get_partition_info(id: str, username: str = Header(None), password: str = Header(None)):
+async def get_partition_info(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "orchestration")
     stack = CONNECTOR.get_stack(id)
     if not stack:
@@ -54,7 +55,7 @@ async def get_partition_info(id: str, username: str = Header(None), password: st
 
 
 @ROUTER.delete("/openstack/partitions/{id}")
-async def delete_partition(id: str, username: str = Header(None), password: str = Header(None)):
+async def delete_partition(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "orchestration")
     result = CONNECTOR.delete_stack(id)
     return {"result": result}
