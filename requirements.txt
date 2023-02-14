@@ -4,7 +4,7 @@
 #
 #    pip-compile requirements.in
 #
-apache-libcloud==3.6.0
+apache-libcloud==3.7.0
     # via -r requirements.in
 appdirs==1.4.4
     # via black
