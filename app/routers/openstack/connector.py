@@ -38,7 +38,7 @@ class OpenStackConnector(BaseConnector):
             self._driver = OpenStack(
                 username,
                 password,
-                ex_tenant_name="demo1",
+                ex_tenant_name="demo1",  #TODO: pass real tenant name
                 ex_domain_name="Default",
                 ex_force_service_type=service,
                 ex_force_service_name=SERVICE_NAMES[service],
@@ -121,7 +121,7 @@ class OpenStackConnector(BaseConnector):
         try:
             response = self._driver.connection.request(action=action, data=data, method=method)
         except libcloud.common.exceptions.BaseHTTPError as e:
-            LOG.error(e)
+            LOG.error(f"HTTP error: {e}")
         if not response:
             return None
         result = response.parse_body()
@@ -173,8 +173,11 @@ class OpenStackConnector(BaseConnector):
                 if it["id"] == stack_id:
                     return it
             return {}
-        stack_info = self._request(action=f"stacks/{stack_id}", method="GET", data={}, expect=[http.client.OK])
-        return stack_info.get("stack", None) if stack_info else {}
+        stacks = self.list_stacks()  # libcloud (tested on 1.7.0) fails to parse output if stack does not exist
+        if list(filter(lambda stack: stack.get('id') == stack_id, stacks)):
+            stack_info = self._request(action=f'stacks/{stack_id}', method="GET", data={}, expect=[http.client.OK])
+            return stack_info.get("stack", None) if stack_info else {}
+        return {}
 
     def delete_stack(self, stack_id: str) -> str:
         stack = self.get_stack(stack_id)
