@@ -16,7 +16,7 @@
    },
    "template":{
       "heat_template_version":"2013-05-23",
-      "description":"Sky Workflows heat templeate",
+      "description":"Sky Workflows heat template",
       "parameters":{
          "image":{
             "type":"string",
@@ -233,7 +233,7 @@
             "properties":{
                "name":{
                   "str_replace":{
-                     "template":"$STACK_NAME-phead.skyworkflows.com",
+                     "template":"$STACK_NAME-phead.openworkload.org",
                      "params":{
                         "$STACK_NAME":{
                            "get_param":"OS::stack_name"
@@ -297,7 +297,7 @@
                   "properties":{
                      "name":{
                         "str_replace":{
-                           "template":"$STACK_NAME-node%index%.skyworkflows.com",
+                           "template":"$STACK_NAME-node%index%.openworkload.org",
                            "params":{
                               "$STACK_NAME":{
                                  "get_param":"OS::stack_name"
