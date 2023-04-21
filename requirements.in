@@ -9,6 +9,7 @@ pip-tools
 pydantic
 jinja2
 uvicorn
+typed-ast==1.5.4
 
 # Fix unsatisfied dependency on dataclasses 0.8 issue
 dataclasses==0.6
