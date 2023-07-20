@@ -16,7 +16,7 @@
    },
    "template":{
       "heat_template_version":"2013-05-23",
-      "description":"Sky Workflows heat template",
+      "description":"Open Workload heat template",
       "parameters":{
          "image":{
             "type":"string",
