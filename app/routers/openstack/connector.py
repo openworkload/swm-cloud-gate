@@ -174,7 +174,7 @@ class OpenStackConnector(BaseConnector):
                     return it
             return {}
         stacks = self.list_stacks()  # libcloud (tested on 1.7.0) fails to parse output if stack does not exist
-        if list(filter(lambda stack: stack.get("id") == stack_id, stacks)):
+        if list(filter(lambda stack: stack.get("id") == stack_id or stack.get("stack_name") == stack_id, stacks)):
             stack_info = self._request(action=f"stacks/{stack_id}", method="GET", data={}, expect=[http.client.OK])
             return stack_info.get("stack", None) if stack_info else {}
         return {}
