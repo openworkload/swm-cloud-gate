@@ -233,7 +233,7 @@
             "properties":{
                "name":{
                   "str_replace":{
-                     "template":"$STACK_NAME-phead.openworkload.org",
+                     "template":"$STACK_NAME-main.openworkload.org",
                      "params":{
                         "$STACK_NAME":{
                            "get_param":"OS::stack_name"
@@ -262,7 +262,7 @@
                      "params":{
                         "__hostname__":{
                            "str_replace":{
-                              "template":"$STACK_NAME-phead",
+                              "template":"$STACK_NAME-main",
                               "params":{
                                  "$STACK_NAME":{
                                     "get_param":"OS::stack_name"
