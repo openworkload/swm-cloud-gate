@@ -96,6 +96,7 @@ class OpenStackConnector(BaseConnector):
         flavor_name: str,
         key_name: str,
         count: str,
+        job_id: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader, autoescape=True)
@@ -106,6 +107,7 @@ class OpenStackConnector(BaseConnector):
             flavor_name=flavor_name,
             key_name=key_name,
             compute_instances_count=count,
+            job_id=job_id,
         )
         return json.loads(json_str)
 
@@ -149,6 +151,7 @@ class OpenStackConnector(BaseConnector):
         flavor_name: str,
         key_name: str,
         count: str,
+        jobid: str,
     ) -> str:
         if self._test_responses:
             id = str(uuid.uuid4())
@@ -163,7 +166,7 @@ class OpenStackConnector(BaseConnector):
             }
             self._test_responses.setdefault("stacks", []).append(new_stack)
             return {"id": id, "links": []}
-        template = self._get_stack_template(stack_name, image_name, flavor_name, key_name, count)
+        template = self._get_stack_template(stack_name, image_name, flavor_name, key_name, count, jobid)
         result = self._request(action="stacks", method="POST", data=template, expect=[http.client.CREATED])
         return result.get("stack", {}) if result else {}
 

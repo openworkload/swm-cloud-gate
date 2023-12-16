@@ -7,6 +7,7 @@
       "image":"{{ image_name }}",
       "flavor":"{{ flavor_name }}",
       "key_name":"{{ key_name }}",
+      "job_id":"{{ job_id }}",
       "public_net":"public1",
       "private_net_cidr":"10.0.0.0/24",
       "private_net_gateway":"10.0.0.1",
@@ -73,6 +74,10 @@
          "compute_instances_count":{
             "type":"string",
             "description":"Count of compute instances"
+         },
+         "job_id":{
+            "type":"string",
+            "description":"What job id we create the resources for"
          }
       },
       "resources":{
@@ -278,9 +283,12 @@
                         },
                         "__compute_instances_count__":{
                            "get_param":"compute_instances_count"
+                        },
+                        "__job_id__":{
+                           "get_param":"job_id"
                         }
                      },
-                     "template": "#!/bin/bash -ex\n/opt/swm/current/scripts/openstack-vm-init.sh -m -h __hostname__ -s __private_subnet_cidr__"
+                     "template": "#!/bin/bash -ex\n/opt/swm/current/scripts/openstack-vm-init.sh -m -h __hostname__ -s __private_subnet_cidr__ -j __job_id__"
                   }
                },
                "user_data_format":"RAW"
@@ -353,9 +361,12 @@
                               },
                               "__compute_instances_count__":{
                                  "get_param":"compute_instances_count"
+                              },
+                              "__job_id__":{
+                                 "get_param":"job_id"
                               }
                            },
-                           "template": "#!/bin/bash -ex\n/opt/swm/current/scripts/openstack-vm-init.sh -h __hostname__ -i __master_instance_private_ip__"
+                           "template": "#!/bin/bash -ex\n/opt/swm/current/scripts/openstack-vm-init.sh -h __hostname__ -i __master_instance_private_ip__ -j __job_id__"
                         }
                      },
                      "user_data_format":"RAW"

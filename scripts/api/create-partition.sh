@@ -16,7 +16,8 @@ HEADER5="tenantname: demo1"
 HEADER6="imagename: cirros"
 HEADER7="flavorname: m1.micro"
 HEADER8="keyname: demo1"
-HEADER9="count: 1"
+HEADER9="count: 0"
+HEADER10="jobid: 3579a076-9924-11ee-ba53-a3132f7ae2fb"
 URL="https://${HOST}:${PORT}/openstack/partitions"
 
 curl --request ${REQUEST}\
@@ -32,5 +33,6 @@ curl --request ${REQUEST}\
      --header "${HEADER7}"\
      --header "${HEADER8}"\
      --header "${HEADER9}"\
+     --header "${HEADER10}"\
      ${URL}
 echo

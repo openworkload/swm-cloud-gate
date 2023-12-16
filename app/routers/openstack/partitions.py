@@ -23,10 +23,11 @@ async def create_partition(
     flavorname: str = EMPTY_HEADER,
     keyname: str = EMPTY_HEADER,
     count: str = EMPTY_HEADER,
+    jobid: str = EMPTY_HEADER,
 ):
     CONNECTOR.reinitialize(username, password, "orchestration")
-    result = CONNECTOR.create_stack(tenantname, partname, imagename, flavorname, keyname, count)
-    LOG.info(f"Create partition {partname} for tenant {tenantname}")
+    result = CONNECTOR.create_stack(tenantname, partname, imagename, flavorname, keyname, count, jobid)
+    LOG.info(f"Create partition {partname} for tenant {tenantname}, job id: {jobid}")
     return {"partition": result}
 
 
