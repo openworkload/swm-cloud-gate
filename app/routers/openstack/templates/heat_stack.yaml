@@ -1,0 +1,218 @@
+stack_name: {{ stack_name }}
+disable_rollback: true
+
+template:
+
+  heat_template_version: "2021-04-16"
+  description: Template to deploy Sky Port partition compute resources in OpenStack
+
+  parameters:
+    image:
+      type: string
+      label: VM image
+      description: Name or ID of image to use for the instance
+      default: {{ image_name }}
+      constraints:
+        - custom_constraint: glance.image
+    flavor:
+      type: string
+      label: VM flavor
+      description: Name of flavor to use for the instance
+      default: {{ flavor_name }}
+      constraints:
+      - custom_constraint: nova.flavor
+    key_name:
+      type: string
+      label: Key name
+      description: Name of key pair to use for the server
+      default: {{ key_name }}
+      constraints:
+        - custom_constraint: nova.keypair
+    job_id:
+      type: string
+      label: Job ID
+      description: What job id we create the resources for
+      default: {{ job_id }}
+    swm_source:
+      type: string
+      label: SWM source
+      description: Where swm files came from in the VM
+      default: {{ swm_source }}
+    public_net:
+      type: string
+      label: Public network
+      description: Name or ID of public network to use for the server
+      default: public1
+      constraints:
+        - custom_constraint: neutron.network
+    private_net_cidr:
+      type: string
+      label: Private network CIDR
+      description: Private network address (CIDR notation, i.e 10.0.0.0/24)
+      default: 10.0.0.0/24
+    private_net_gateway:
+      type: string
+      label: Private network gateway
+      description: Private network gateway address
+      default: 10.0.0.1
+    private_net_pool_start:
+      type: string
+      label: Private network pool start
+      description: Start of private network IP address allocation pool
+      default: 10.0.0.100
+    private_net_pool_end:
+      type: string
+      label: Private network pool end
+      description: End of private network IP address allocation pool
+      default: 10.0.0.254
+    compute_instances_count:
+      type: number
+      label: Private network pool end
+      description: End of private network IP address allocation pool
+      default: {{ compute_instances_count }}
+
+  resources:
+
+    security_group:
+      type: OS::Neutron::SecurityGroup
+      properties:
+        description: Secutiry group rules for compute nodes
+        name:
+          str_replace:
+            template: $STACK_NAME-security_group
+            params:
+              $STACK_NAME: { get_param: OS::stack_name }
+        rules:
+          - remote_ip_prefix: 0.0.0.0/0
+            protocol: icmp
+          - remote_ip_prefix: 0.0.0.0/0
+            protocol: tcp
+
+    private_net:
+      type: OS::Neutron::Net
+      properties:
+        name:
+          str_replace:
+            template: $STACK_NAME-private_net
+            params:
+              $STACK_NAME: { get_param: OS::stack_name }
+
+
+    private_subnet:
+      type: OS::Neutron::Subnet
+      properties:
+        name:
+          str_replace:
+            template: $STACK_NAME-private_subnet
+            params:
+              $STACK_NAME: { get_param: OS::stack_name }
+        network_id: { get_resource: private_net }
+        cidr: { get_param: private_net_cidr }
+        gateway_ip: { get_param: private_net_gateway }
+        allocation_pools:
+          - start: { get_param: private_net_pool_start }
+            end: { get_param: private_net_pool_end }
+
+    router:
+      type: OS::Neutron::Router
+      properties:
+        name:
+          str_replace:
+            template: $STACK_NAME-router
+            params:
+              $STACK_NAME: { get_param: OS::stack_name }
+        external_gateway_info:
+          network: { get_param: public_net }
+
+    router_interface:
+      type: OS::Neutron::RouterInterface
+      properties:
+        router_id: { get_resource: router }
+        subnet_id: { get_resource: private_subnet }
+
+    master_instance_private_subnet_port:
+      type: OS::Neutron::Port
+      properties:
+        network_id: { get_resource: private_net }
+        fixed_ips:
+          - subnet_id: { get_resource: private_subnet }
+        security_groups:
+          - { get_resource: security_group }
+
+    master_instance_floating_ip:
+      type: OS::Neutron::FloatingIP
+      properties:
+        floating_network: { get_param: public_net }
+        port_id: { get_resource: master_instance_private_subnet_port }
+
+    master_instance:
+      type: OS::Nova::Server
+      properties:
+        name:
+          str_replace:
+            template: $STACK_NAME-main.openworkload.org
+            params:
+              $STACK_NAME: { get_param: OS::stack_name }
+        image: { get_param: image }
+        flavor: { get_param: flavor }
+        key_name:  { get_param: key_name }
+        networks:
+          - port: { get_resource: master_instance_private_subnet_port }
+        user_data:
+          str_replace:
+            params:
+              __hostname__:
+                str_replace:
+                  template: $STACK_NAME-main
+                  params:
+                    $STACK_NAME: { get_param: OS::stack_name }
+              __private_subnet_cidr__: { get_attr: [private_subnet, cidr] }
+              __job_id__: { get_param: job_id }
+              __swm_source__: { get_param: swm_source }
+            template: "#!/bin/bash -ex\n/opt/swm/current/scripts/openstack-vm-init.sh -m -h __hostname__ -s __private_subnet_cidr__ -j __job_id__ -l __swm_source__"
+        user_data_format:  RAW
+
+    compute_instances:
+      type: OS::Heat::ResourceGroup
+      properties:
+        count: { get_param: compute_instances_count }
+        resource_def: 
+          type: OS::Nova::Server
+          properties:
+            name:
+              str_replace:
+                template: $STACK_NAME-node%index%.openworkload.org
+                params:
+                  $STACK_NAME: { get_param: OS::stack_name }
+            image: { get_param: image }
+            flavor: { get_param: flavor }
+            key_name:  { get_param: key_name }
+            networks:
+              - subnet: { get_resource: private_subnet }
+            security_groups:
+              - { get_resource: security_group }
+            user_data:
+              str_replace:
+                params:
+                  __hostname__:
+                    str_replace:
+                      template: $STACK_NAME-node%index%
+                      params:
+                        $STACK_NAME: { get_param: OS::stack_name }
+                  __private_subnet_cidr__: { get_attr: [private_subnet, cidr] }
+                  __master_instance_private_ip__: { get_attr: [master_instance, first_address] }
+                  __job_id__: { get_param: job_id }
+                  __swm_source__: { get_param: swm_source }
+                template: "#!/bin/bash -ex\n/opt/swm/current/scripts/openstack-vm-init.sh -h __hostname__ -i __master_instance_private_ip__ -j __job_id__ -l __swm_source__"
+            user_data_format:  RAW
+
+  outputs:
+    master_instance_public_ip:
+      description: IP address of master_instance in public network
+      value: { get_attr: [master_instance_floating_ip, floating_ip_address] }
+    master_instance_private_ip:
+      description: IP address of master_instance in private network
+      value: { get_attr: [master_instance, first_address] }
+    compute_instances_private_ips:
+      description: IP addresses of compute_instances in private network
+      value: { get_attr: [compute_instances, first_address] }

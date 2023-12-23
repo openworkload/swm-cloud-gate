@@ -1,6 +1,6 @@
 import datetime
 import http
-import json
+import yaml
 import logging
 import typing
 import uuid
@@ -16,7 +16,7 @@ from libcloud.compute.types import Provider
 from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
-STACK_TEMLPATE_FILE = "app/routers/openstack/templates/heat_stack.json"
+STACK_TEMLPATE_FILE = "app/routers/openstack/templates/heat_stack.yaml"
 SERVICE_NAMES = {"compute": "nova", "orchestration": "heat", "rating": "cloudkitty"}
 
 
@@ -97,19 +97,30 @@ class OpenStackConnector(BaseConnector):
         key_name: str,
         count: str,
         job_id: str,
+        runtime: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader, autoescape=True)
         template = template_env.get_template(STACK_TEMLPATE_FILE)
-        json_str = template.render(
+        runtime_params = self._get_runtime_params(runtime)
+        yaml_str = template.render(
             stack_name=stack_name,
             image_name=image_name,
             flavor_name=flavor_name,
             key_name=key_name,
             compute_instances_count=count,
             job_id=job_id,
+            swm_source=runtime_params.get("swm_source", "preinstalled"),
         )
-        return json.loads(json_str)
+        return yaml.safe_load(yaml_str)
+
+    def _get_runtime_params(self, runtime: str) -> dict[str, str]:
+        runtime_params: dict[str, str] = {}
+        for it in runtime.split(","):
+            [key, value] = it.split("=")
+            runtime_params[key] = value
+        LOG.debug(f"Runtime parameters string: {runtime}, parsed: {runtime_params}")
+        return runtime_params
 
     def _request(
         self,
@@ -151,7 +162,8 @@ class OpenStackConnector(BaseConnector):
         flavor_name: str,
         key_name: str,
         count: str,
-        jobid: str,
+        job_id: str,
+        runtime: str,
     ) -> str:
         if self._test_responses:
             id = str(uuid.uuid4())
@@ -166,7 +178,7 @@ class OpenStackConnector(BaseConnector):
             }
             self._test_responses.setdefault("stacks", []).append(new_stack)
             return {"id": id, "links": []}
-        template = self._get_stack_template(stack_name, image_name, flavor_name, key_name, count, jobid)
+        template = self._get_stack_template(stack_name, image_name, flavor_name, key_name, count, job_id, runtime)
         result = self._request(action="stacks", method="POST", data=template, expect=[http.client.CREATED])
         return result.get("stack", {}) if result else {}
 
