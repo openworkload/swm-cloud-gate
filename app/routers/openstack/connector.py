@@ -1,12 +1,12 @@
 import datetime
 import http
-import yaml
 import logging
 import typing
 import uuid
 
 import jinja2
 import libcloud.security
+import yaml
 from libcloud.common.openstack import OpenStackResponse
 from libcloud.compute.base import NodeImage
 from libcloud.compute.drivers.openstack import OpenStackNodeSize
@@ -98,6 +98,7 @@ class OpenStackConnector(BaseConnector):
         count: str,
         job_id: str,
         runtime: str,
+        ports: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader, autoescape=True)
@@ -111,6 +112,7 @@ class OpenStackConnector(BaseConnector):
             compute_instances_count=count,
             job_id=job_id,
             swm_source=runtime_params.get("swm_source", "preinstalled"),
+            ingres_tcp_ports=ports.split(","),
         )
         return yaml.safe_load(yaml_str)
 
@@ -164,6 +166,7 @@ class OpenStackConnector(BaseConnector):
         count: str,
         job_id: str,
         runtime: str,
+        ports: str,
     ) -> str:
         if self._test_responses:
             id = str(uuid.uuid4())
@@ -178,7 +181,16 @@ class OpenStackConnector(BaseConnector):
             }
             self._test_responses.setdefault("stacks", []).append(new_stack)
             return {"id": id, "links": []}
-        template = self._get_stack_template(stack_name, image_name, flavor_name, key_name, count, job_id, runtime)
+        template = self._get_stack_template(
+            stack_name,
+            image_name,
+            flavor_name,
+            key_name,
+            count,
+            job_id,
+            runtime,
+            ports,
+        )
         result = self._request(action="stacks", method="POST", data=template, expect=[http.client.CREATED])
         return result.get("stack", {}) if result else {}
 

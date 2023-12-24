@@ -18,7 +18,8 @@ HEADER7="flavorname: m1.micro"
 HEADER8="keyname: demo1"
 HEADER9="count: 0"
 HEADER10="jobid: 3579a076-9924-11ee-ba53-a3132f7ae2fb"
-HEADER11="runtime: swm_source=http://172.28.128.2:7777/swm-worker.tar.gz"
+HEADER11="runtime: swm_source=http://10.0.2.15/swm-worker.tar.gz"
+HEADER12="ports: 10001,10022"
 URL="https://${HOST}:${PORT}/openstack/partitions"
 
 curl --request ${REQUEST}\
@@ -35,5 +36,6 @@ curl --request ${REQUEST}\
      --header "${HEADER8}"\
      --header "${HEADER9}"\
      --header "${HEADER10}"\
+     --header "${HEADER11}"\
      ${URL}
 echo

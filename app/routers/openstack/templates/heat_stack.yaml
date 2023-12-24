@@ -87,6 +87,14 @@ template:
             protocol: icmp
           - remote_ip_prefix: 0.0.0.0/0
             protocol: tcp
+            port_range_min: 22
+            port_range_max: 22
+          {% for port in ingres_tcp_ports %}
+          - remote_ip_prefix: 0.0.0.0/0
+            protocol: tcp
+            port_range_min: {{ port }}
+            port_range_max: {{ port }}
+          {% endfor %}
 
     private_net:
       type: OS::Neutron::Net
