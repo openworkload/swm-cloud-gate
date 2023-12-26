@@ -1,0 +1,33 @@
+version: 1
+disable_existing_loggers: True
+
+formatters:
+    default:
+        "()": uvicorn.logging.DefaultFormatter
+        format: "[%(asctime)s] %(levelprefix)s%(message)s"
+        use_colors: True
+        datefmt: '%d-%m-%Y %H:%M:%S'
+    detailed:
+        format: "%(asctime)s [%(levelname)s] %(name)s.%(funcName)s(): %(message)s"
+        datefmt: '%d-%m-%Y %H:%M:%S'
+
+handlers:
+    console:
+      class: logging.StreamHandler
+      level: DEBUG
+      formatter: default
+      stream: ext://sys.stdout
+
+    debug_file_handler:
+      class: logging.handlers.RotatingFileHandler
+      level: DEBUG
+      formatter: detailed
+      filename: /tmp/swm-cloud-gate.log
+      maxBytes: 10485760 # 10MB
+      backupCount: 20
+      encoding: utf8
+
+root:
+  level: NOTSET
+  handlers: [console, debug_file_handler]
+  propagate: yes

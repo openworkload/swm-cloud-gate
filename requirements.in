@@ -5,6 +5,7 @@ fastapi>=0.60
 flake8
 flake8-bugbear
 isort
+pyyaml
 pip-tools
 pydantic
 jinja2
