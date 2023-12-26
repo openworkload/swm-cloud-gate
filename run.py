@@ -11,11 +11,10 @@ def main():
     spool = "/opt/swm/spool/secure"
     uvicorn.run(
         "app.main:app",
-        log_config=None,  # custom logger will be used
+        log_config="logging.yaml",
         host=socket.gethostname(),
         port=8444,
         reload=False,
-        log_level="debug",
         timeout_keep_alive=60,
         ssl_version=ssl.PROTOCOL_TLS_SERVER,
         ssl_ca_certs=os.path.join(spool, "cluster", "cert.pem"),

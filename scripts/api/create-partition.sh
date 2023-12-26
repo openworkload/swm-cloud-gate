@@ -37,5 +37,6 @@ curl --request ${REQUEST}\
      --header "${HEADER9}"\
      --header "${HEADER10}"\
      --header "${HEADER11}"\
+     --header "${HEADER12}"\
      ${URL}
 echo

@@ -7,10 +7,8 @@ from .routers.openstack import images as openstack_images
 from .routers.openstack import partitions as openstack_partitions
 from .routers.openstack import sizes as openstack_sizes
 
-logger = logging.getLogger("fastapi")
+logger = logging.getLogger("swm")
 logger.setLevel(logging.DEBUG)
-
-logging.config.fileConfig("app/logging.conf", disable_existing_loggers=False)
 
 # For easy aborting
 with open("/var/tmp/swm-cloud-gate.pid", "w") as f:
