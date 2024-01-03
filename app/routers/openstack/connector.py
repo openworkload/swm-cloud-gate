@@ -17,6 +17,7 @@ from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
 STACK_TEMLPATE_FILE = "app/routers/openstack/templates/heat_stack.yaml"
+CLOUD_INIT_SCRIPT_FILE = "app/routers/openstack/templates/cloud-init.sh"
 SERVICE_NAMES = {"compute": "nova", "orchestration": "heat", "rating": "cloudkitty"}
 
 
@@ -69,7 +70,7 @@ class OpenStackConnector(BaseConnector):
             sizes = self._driver.list_sizes()
             return sizes
         except Exception as e:
-            LOG.error(f"{e}")
+            LOG.error(f"Cannot list flavors: {e}")
         return None
 
     def list_images(self):
@@ -113,8 +114,16 @@ class OpenStackConnector(BaseConnector):
             job_id=job_id,
             swm_source=runtime_params.get("swm_source", "preinstalled"),
             ingres_tcp_ports=ports.split(","),
+            init_script=self._get_cloud_init_script(),
         )
         return yaml.safe_load(yaml_str)
+
+    def _get_cloud_init_script(self) -> str:
+        template_loader = jinja2.FileSystemLoader(searchpath="./")
+        template_env = jinja2.Environment(loader=template_loader)
+        template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
+        script:str = template.render()
+        return script
 
     def _get_runtime_params(self, runtime: str) -> dict[str, str]:
         runtime_params: dict[str, str] = {}
@@ -181,16 +190,21 @@ class OpenStackConnector(BaseConnector):
             }
             self._test_responses.setdefault("stacks", []).append(new_stack)
             return {"id": id, "links": []}
-        template = self._get_stack_template(
-            stack_name,
-            image_name,
-            flavor_name,
-            key_name,
-            count,
-            job_id,
-            runtime,
-            ports,
-        )
+        try:
+            template = self._get_stack_template(
+                stack_name,
+                image_name,
+                flavor_name,
+                key_name,
+                count,
+                job_id,
+                runtime,
+                ports,
+            )
+        except Exception as e:
+            LOG.error(f"Cannot read stack template: {e}")
+            return {}
+        LOG.debug(f"Heat stack template has been loaded")
         result = self._request(action="stacks", method="POST", data=template, expect=[http.client.CREATED])
         return result.get("stack", {}) if result else {}
 

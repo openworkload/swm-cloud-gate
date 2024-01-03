@@ -177,7 +177,8 @@ template:
               __private_subnet_cidr__: { get_attr: [private_subnet, cidr] }
               __job_id__: { get_param: job_id }
               __swm_source__: { get_param: swm_source }
-            template: "#!/bin/bash -ex\n/opt/swm/current/scripts/openstack-vm-init.sh -m -h __hostname__ -s __private_subnet_cidr__ -j __job_id__ -l __swm_source__"
+            template: |+
+              {{ init_script|indent(14, False)|safe }}
         user_data_format:  RAW
 
     compute_instances:
@@ -211,7 +212,8 @@ template:
                   __master_instance_private_ip__: { get_attr: [master_instance, first_address] }
                   __job_id__: { get_param: job_id }
                   __swm_source__: { get_param: swm_source }
-                template: "#!/bin/bash -ex\n/opt/swm/current/scripts/openstack-vm-init.sh -h __hostname__ -i __master_instance_private_ip__ -j __job_id__ -l __swm_source__"
+                template: |+
+                  {{ init_script|indent(18, False)|safe }}
             user_data_format:  RAW
 
   outputs:
