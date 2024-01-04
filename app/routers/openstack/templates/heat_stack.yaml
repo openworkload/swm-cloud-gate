@@ -28,16 +28,6 @@ template:
       default: {{ key_name }}
       constraints:
         - custom_constraint: nova.keypair
-    job_id:
-      type: string
-      label: Job ID
-      description: What job id we create the resources for
-      default: {{ job_id }}
-    swm_source:
-      type: string
-      label: SWM source
-      description: Where swm files came from in the VM
-      default: {{ swm_source }}
     public_net:
       type: string
       label: Public network
@@ -169,14 +159,12 @@ template:
         user_data:
           str_replace:
             params:
-              __hostname__:
+              $HOST_NAME:
                 str_replace:
                   template: $STACK_NAME-main
                   params:
                     $STACK_NAME: { get_param: OS::stack_name }
-              __private_subnet_cidr__: { get_attr: [private_subnet, cidr] }
-              __job_id__: { get_param: job_id }
-              __swm_source__: { get_param: swm_source }
+              $PRIVATE_SUBNET_CIDR: { get_attr: [private_subnet, cidr] }
             template: |+
               {{ init_script|indent(14, False)|safe }}
         user_data_format:  RAW
@@ -203,15 +191,13 @@ template:
             user_data:
               str_replace:
                 params:
-                  __hostname__:
+                  $HOST_NAME:
                     str_replace:
                       template: $STACK_NAME-node%index%
                       params:
                         $STACK_NAME: { get_param: OS::stack_name }
-                  __private_subnet_cidr__: { get_attr: [private_subnet, cidr] }
-                  __master_instance_private_ip__: { get_attr: [master_instance, first_address] }
-                  __job_id__: { get_param: job_id }
-                  __swm_source__: { get_param: swm_source }
+                  $PRIVATE_SUBNET_CIDR: { get_attr: [private_subnet, cidr] }
+                  $MAIN_INSTANCE_PRIVATE_IP: { get_attr: [master_instance, first_address] }
                 template: |+
                   {{ init_script|indent(18, False)|safe }}
             user_data_format:  RAW

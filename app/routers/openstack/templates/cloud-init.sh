@@ -1,15 +1,14 @@
 #!/bin/bash -ex
 
-echo "----------------------------------------------------"
 GATEWAY_IP=$(ip -4 addr show $(ip -4 route list 0/0 | awk -F' ' '{ print $5 }') | grep -oP "(?<=inet\\s)\\d+(\\.\\d+){3}")
 IS_MAIN=true
-echo $(date) ": start VM initialization (HOST: __hostname__, IP=$GATEWAY_IP, master: ${IS_MAIN})"
+echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$GATEWAY_IP, master: ${IS_MAIN})"
 
-hostname __hostname__.openworkload.org
-echo __hostname__.openworkload.org > /etc/hostname
+hostname $HOST_NAME.openworkload.org
+echo $HOST_NAME.openworkload.org > /etc/hostname
 echo $(date) ": hostname=$(hostname)"
 
-echo $GATEWAY_IP __hostname__.openworkload.org __hostname__ >> /etc/hosts
+echo $GATEWAY_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
 echo $(date) ": /etc/hosts:"
 cat /etc/hosts
 echo
@@ -29,7 +28,7 @@ echo
 
 if [ $IS_MAIN == "true" ];
 then
-    echo "/home __private_subnet_cidr__(rw,async,no_root_squash)" | sed "s/\\/25/\\/255.255.255.0/g" >> /etc/exports
+    echo "/home $PRIVATE_SUBNET_CIDR(rw,async,no_root_squash)" | sed "s/\\/25/\\/255.255.255.0/g" >> /etc/exports
     echo $(date) ": /etc/exports:"
     cat /etc/exports
     echo
@@ -41,7 +40,7 @@ then
     #systemctl | grep nfs
 
 else
-    echo "__master_instance_private_ip__:/home /home nfs rsize=32768,wsize=32768,hard,intr,async 0 0" >> /etc/fstab
+    echo "$MAIN_INSTANCE_PRIVATE_IP:/home /home nfs rsize=32768,wsize=32768,hard,intr,async 0 0" >> /etc/fstab
     echo $(date) ": /etc/fstab:"
     cat /etc/fstab
     echo
@@ -54,31 +53,31 @@ else
 fi
 echo
 
-echo $(date) ": ensure swm worker is installed, SWM_SOURCE=__swm_source__"
+echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source }}"
 TMP_DIR=$(mktemp -d -t swm-worker-XXXXX)
 if [[ ! "$TMP_DIR" || ! -d "$TMP_DIR" ]]; then
-  echo "Could not create temporary directory"
-  exit 1
+    echo "Could not create temporary directory"
+    exit 1
 fi
 function cleanup {
-  rm -rf "$TMP_DIR"
-  echo "Deleted temporary directory $TMP_DIR"
+    rm -rf "$TMP_DIR"
+    echo "Deleted temporary directory $TMP_DIR"
 }
 trap cleanup EXIT
 pushd $TMP_DIR
-if [[ __swm_source__ == "http://*.tar.gz" ]]; then
-    wget __swm_source__ --output-document=swm-worker.tar.gz
+if [[ {{ swm_source }} == "http://*.tar.gz" ]]; then
+    wget {{ swm_source }} --output-document=swm-worker.tar.gz
     mkdir -p /opt/swm
     tar zfx ./swm-worker.tar.gz --directory /opt/swm/
 fi
 popd
 
-echo SWM_SNAME=__hostname__ > /etc/swm.conf
+echo SWM_SNAME=$HOST_NAME > /etc/swm.conf
 echo $(date) ": /etc/swm.conf:"
 cat /etc/swm.conf
 echo
 
-JOB_DIR=/opt/swm/spool/job/__job_id__
+JOB_DIR=/opt/swm/spool/job/{{ job_id }}
 echo $(date) ": create job directory: $JOB_DIR"
 mkdir -p $JOB_DIR
 
@@ -93,6 +92,5 @@ ps aux | grep swm
 
 echo
 echo $(date) ": the initialization has finished"
-echo "----------------------------------------------------"
 
 exit 0

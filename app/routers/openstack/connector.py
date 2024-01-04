@@ -104,25 +104,23 @@ class OpenStackConnector(BaseConnector):
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader, autoescape=True)
         template = template_env.get_template(STACK_TEMLPATE_FILE)
-        runtime_params = self._get_runtime_params(runtime)
         yaml_str = template.render(
             stack_name=stack_name,
             image_name=image_name,
             flavor_name=flavor_name,
             key_name=key_name,
             compute_instances_count=count,
-            job_id=job_id,
-            swm_source=runtime_params.get("swm_source", "preinstalled"),
             ingres_tcp_ports=ports.split(","),
-            init_script=self._get_cloud_init_script(),
+            init_script=self._get_cloud_init_script(job_id, runtime),
         )
         return yaml.safe_load(yaml_str)
 
-    def _get_cloud_init_script(self) -> str:
+    def _get_cloud_init_script(self, job_id: str, runtime: str) -> str:
+        runtime_params = self._get_runtime_params(runtime)
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader)
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
-        script:str = template.render()
+        script:str = template.render(job_id=job_id, swm_source=runtime_params.get("swm_source", "preinstalled"),)
         return script
 
     def _get_runtime_params(self, runtime: str) -> dict[str, str]:
