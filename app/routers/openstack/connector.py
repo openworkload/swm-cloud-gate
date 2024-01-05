@@ -7,6 +7,7 @@ import uuid
 import jinja2
 import libcloud.security
 import yaml
+import traceback
 from libcloud.common.openstack import OpenStackResponse
 from libcloud.compute.base import NodeImage
 from libcloud.compute.drivers.openstack import OpenStackNodeSize
@@ -35,7 +36,7 @@ class OpenStackConnector(BaseConnector):
             libcloud.security.VERIFY_SSL_CERT = False  # FIXME: use SSL connection
             OpenStack = get_driver(Provider.OPENSTACK)
             url = "http://172.28.128.254:5000"
-            LOG.info(f"Connect to OpenStack at {url}")
+            LOG.info(f"Connect to OpenStack: {url}")
             self._driver = OpenStack(
                 username,
                 password,
@@ -120,15 +121,19 @@ class OpenStackConnector(BaseConnector):
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader)
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
-        script:str = template.render(job_id=job_id, swm_source=runtime_params.get("swm_source", "preinstalled"),)
+        script: str = template.render(
+            job_id=job_id,
+            swm_source=runtime_params.get("swm_source"),
+        )
         return script
 
     def _get_runtime_params(self, runtime: str) -> dict[str, str]:
         runtime_params: dict[str, str] = {}
+        LOG.debug(f"Runtime parameters string: {runtime}")
         for it in runtime.split(","):
             [key, value] = it.split("=")
             runtime_params[key] = value
-        LOG.debug(f"Runtime parameters string: {runtime}, parsed: {runtime_params}")
+        LOG.debug(f"Runtime parameters parsed: {runtime_params}")
         return runtime_params
 
     def _request(
@@ -200,9 +205,9 @@ class OpenStackConnector(BaseConnector):
                 ports,
             )
         except Exception as e:
-            LOG.error(f"Cannot read stack template: {e}")
+            LOG.error(f"Cannot read stack template: {e}, {traceback.format_exc()}")
             return {}
-        LOG.debug(f"Heat stack template has been loaded")
+        LOG.debug("Heat stack template has been loaded")
         result = self._request(action="stacks", method="POST", data=template, expect=[http.client.CREATED])
         return result.get("stack", {}) if result else {}
 

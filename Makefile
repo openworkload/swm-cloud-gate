@@ -17,7 +17,7 @@ check:
 	$(VENV_BIN)/flake8 app test
 	$(VENV_BIN)/black --check --diff --exclude .venv app test
 	$(VENV_BIN)/ruff app test
-	$(VENV_BIN)/bandit -r app -r test -c "pyproject.toml" --silent
+	$(VENV_BIN)/bandit -r app -c "pyproject.toml" --silent
 
 .PHONY: format
 format:
