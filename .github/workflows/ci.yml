@@ -1,0 +1,26 @@
+name: Python tests
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  unittests:
+    runs-on: ubuntu-22.04
+
+    steps:
+
+    - uses: actions/checkout@v1
+
+    - name: Linters
+      run: |
+        make prepare-venv
+        make check
+
+    - name: Unit tests
+      run: make test
