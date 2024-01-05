@@ -1,13 +1,13 @@
 import datetime
 import http
 import logging
+import traceback
 import typing
 import uuid
 
 import jinja2
 import libcloud.security
 import yaml
-import traceback
 from libcloud.common.openstack import OpenStackResponse
 from libcloud.compute.base import NodeImage
 from libcloud.compute.drivers.openstack import OpenStackNodeSize
@@ -119,7 +119,7 @@ class OpenStackConnector(BaseConnector):
     def _get_cloud_init_script(self, job_id: str, runtime: str) -> str:
         runtime_params = self._get_runtime_params(runtime)
         template_loader = jinja2.FileSystemLoader(searchpath="./")
-        template_env = jinja2.Environment(loader=template_loader)
+        template_env = jinja2.Environment(loader=template_loader, autoescape=True)
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
         script: str = template.render(
             job_id=job_id,
