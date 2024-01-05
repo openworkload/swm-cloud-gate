@@ -3,15 +3,19 @@ apache-libcloud>=3.6.1
 asyncio
 asynctest
 attrs>=19.0.0
+autoflake
+bandit
 black
-fastapi>=0.60
+fastapi==0.63.0  # latest version (0.108.0 for now) is broken: confuses headers
 flake8
 flake8-bugbear
 isort
+mypy >= 0.981
 pyyaml
 pip-tools
 pydantic
 jinja2
+ruff
 uvicorn
 typed-ast==1.5.4
 

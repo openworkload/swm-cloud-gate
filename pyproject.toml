@@ -1,0 +1,57 @@
+[tool.black]
+line-length = 120
+target_version = ['py39']
+exclude = '''
+(
+  /(
+    | \.git
+    | \.venv
+    | \.mypy_cache
+  )/
+)
+'''
+
+[tool.ruff]
+line-length = 120
+exclude = [
+    "swmclient/generated",
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+[tool.isort]
+line_length = 120
+profile = "black"
+skip = ".venv"
+
+[tool.mypy]
+python_version = 3.9
+strict = true
+follow_imports = "silent"
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+allow_untyped_defs = true
+allow_incomplete_defs = true
+allow_untyped_calls = true
+
+[tool.bandit]
+skips = []

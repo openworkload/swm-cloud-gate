@@ -25,7 +25,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# https://mydeveloperplanet.com/2020/03/11/how-to-mock-a-rest-api-in-python/
-# https://requests-mock.readthedocs.io/en/latest/overview.html
-# http://empt1e.blogspot.com/2011/02/mocking-libcloud-using-mox.html
