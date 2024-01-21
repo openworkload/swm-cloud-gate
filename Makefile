@@ -40,3 +40,7 @@ requirements: requirements.txt
 
 requirements.txt: requirements.in
 	@pip-compile $<
+
+.PHONY: azure-build-bicep
+azure-build-bicep:
+	az bicep build -f ./app/routers/azure/templates/partition.bicep --outdir ./app/routers/azure/templates/
