@@ -4,16 +4,16 @@ import typing
 
 from fastapi import APIRouter, Header, HTTPException
 
-from .connector import OpenStackConnector
+from .connector import AzureConnector
 from ..models import PartInfo, convert_to_partition
 
-CONNECTOR = OpenStackConnector()
+CONNECTOR = AzureConnector()
 EMPTY_HEADER = Header(None)
 LOG = logging.getLogger("swm")
 ROUTER = APIRouter()
 
 
-@ROUTER.post("/openstack/partitions")
+@ROUTER.post("/azure/partitions")
 async def create_partition(
     username: str = EMPTY_HEADER,
     password: str = EMPTY_HEADER,
@@ -28,7 +28,7 @@ async def create_partition(
     ports: str = EMPTY_HEADER,
 ):
     CONNECTOR.reinitialize(username, password, "orchestration")
-    result = CONNECTOR.create_stack(
+    result = CONNECTOR.create_deployment(
         tenantname,
         partname,
         imagename,
@@ -39,7 +39,7 @@ async def create_partition(
         runtime,
         ports,
     )
-    LOG.info(f"Create OpenStack partition {partname} for tenant {tenantname}, job id: {jobid}")
+    LOG.info(f"Create Azure partition {partname} for tenant {tenantname}, job id: {jobid}")
     LOG.debug(f"Partition {partname} creation options:")
     LOG.debug(f" * username: {username}")
     LOG.debug(f" * image: {imagename}")
@@ -51,7 +51,7 @@ async def create_partition(
     return {"partition": result}
 
 
-@ROUTER.get("/openstack/partitions")
+@ROUTER.get("/azure/partitions")
 async def list_partitions(username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "orchestration")
     partitions: typing.List[PartInfo] = []
@@ -63,7 +63,7 @@ async def list_partitions(username: str = EMPTY_HEADER, password: str = EMPTY_HE
     return {"partitions": partitions}
 
 
-@ROUTER.get("/openstack/partitions/{id}")
+@ROUTER.get("/azure/partitions/{id}")
 async def get_partition_info(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "orchestration")
     stack = CONNECTOR.get_stack(id)
@@ -75,7 +75,7 @@ async def get_partition_info(id: str, username: str = EMPTY_HEADER, password: st
     return convert_to_partition(stack)
 
 
-@ROUTER.delete("/openstack/partitions/{id}")
+@ROUTER.delete("/azure/partitions/{id}")
 async def delete_partition(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "orchestration")
     result = CONNECTOR.delete_stack(id)

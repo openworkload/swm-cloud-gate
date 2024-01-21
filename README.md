@@ -15,7 +15,7 @@ This is a repository for Sky Port gate that provides cloud integration.
 It is a part of the [Open Workload](https://openworkload.org) project.
 
 # Requirements:
-  * Python >= 3.9
+  * Python >= 3.10
 
 # Preparations:
   * make prepare-venv

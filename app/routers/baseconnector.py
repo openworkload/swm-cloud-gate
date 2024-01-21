@@ -24,3 +24,10 @@ class BaseConnector:
                 except json.decoder.JSONDecodeError as e:
                     LOG.error(e)
         return {}
+
+    def find_image(self, image_id: str) -> typing.Union:
+        images = self.list_images()
+        found = [it for it in images if it.id == image_id]
+        if found:
+            return found[0]
+        return None

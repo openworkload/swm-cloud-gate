@@ -8,52 +8,48 @@ import uuid
 import jinja2
 import libcloud.security
 import yaml
-from libcloud.common.openstack import OpenStackResponse
-from libcloud.compute.base import NodeImage
-from libcloud.compute.drivers.openstack import OpenStackNodeSize
 from libcloud.compute.providers import get_driver
 from libcloud.compute.types import Provider
 
 from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
-STACK_TEMLPATE_FILE = "app/routers/openstack/templates/heat_stack.yaml"
+TEMLPATE_FILE = "app/routers/azure/templates/partition.bicep"
 CLOUD_INIT_SCRIPT_FILE = "app/routers/openstack/templates/cloud-init.sh"
 SERVICE_NAMES = {"compute": "nova", "orchestration": "heat", "rating": "cloudkitty"}
 
 
-class OpenStackConnector(BaseConnector):
-    def __init__(self, username: str = None, password: str = None, service: str = None):
-        self._init_driver(username, password, service)
-        super().__init__("openstack")
+class AzureConnector(BaseConnector):
+    def __init__(self, subscription_id: str, app_id: str, tenant_id: str, password: str):
+        self._init_driver(subscription_id, app_id, tenant_id, password)
+        super().__init__("azure")
 
-    def reinitialize(self, username: str, password: str, service: str) -> None:
+    def reinitialize(self, subscription_id: str, app_id: str, tenant_id: str, password: str) -> None:
         self._init_driver(username, password, service)
 
-    def _init_driver(self, username: str, password: str, service: str) -> None:
-        # See also https://libcloud.readthedocs.io/en/stable/compute/drivers/openstack.html
-        if username and password and service:
-            libcloud.security.VERIFY_SSL_CERT = False
-            OpenStack = get_driver(Provider.OPENSTACK)
-            url = "http://172.28.128.254:5000"
-            LOG.info(f"Connect to OpenStack: {url}")
-            self._driver = OpenStack(
-                username,
-                password,
-                ex_tenant_name="demo1",
-                ex_domain_name="Default",
-                ex_force_service_type=service,
-                ex_force_service_name=SERVICE_NAMES[service],
-                ex_force_auth_url=url,
-                ex_force_auth_version="3.x_password",
+    def _init_driver(self, subscription_id: str, app_id: str, tenant_id: str, password: str) -> None:
+        # See also https://libcloud.readthedocs.io/en/stable/compute/drivers/azure_arm.html
+        subscription_id='3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75',
+        app_id = '17e060c4-cb6e-47ac-a881-e55a4782a573',
+        tenant_id = 'c8d65d6a-d488-4dd9-9399-68f868316782',
+        key_file = '/opt/swm/spool/secure/cluster/private/key.pem',
+        if subscription_id and app_id and tenant_id and password:
+            https://libcloud.readthedocs.io/en/stable/compute/drivers/azure_arm.html
+            AzureDriver = get_driver(Provider.AZURE_ARM)
+            LOG.info("Connect to Azure")
+            self._driver = AzureDriver(
+                tenant_id = tenant_id,
+                subscription_id=subscription_id,
+                key=app_id,
+                key_file=key_file,
             )
 
-    def list_sizes(self):
+    def list_sizes(self) -> list[AzureNodeSize]:
         if "sizes" in self._test_responses:
             node_sizes = []
             for it in self._test_responses["sizes"]:
                 node_sizes.append(
-                    OpenStackNodeSize(
+                    AzureNodeSize(
                         id=it["id"],
                         name=it["name"],
                         bandwidth=it["bandwidth"],
@@ -72,7 +68,7 @@ class OpenStackConnector(BaseConnector):
             return sizes
         except Exception as e:
             LOG.error(f"Cannot list flavors: {e}")
-        return None
+        return []
 
     def list_images(self):
         if "images" in self._test_responses:
@@ -83,13 +79,6 @@ class OpenStackConnector(BaseConnector):
                 )
             return node_images
         return self._driver.list_images()
-
-    def find_image(self, image_id: str):
-        images = self.list_images()
-        found = [it for it in images if it.id == image_id]
-        if found:
-            return found[0]
-        return None
 
     def _get_stack_template(
         self,
@@ -104,7 +93,7 @@ class OpenStackConnector(BaseConnector):
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader, autoescape=True)
-        template = template_env.get_template(STACK_TEMLPATE_FILE)
+        template = template_env.get_template(TEMLPATE_FILE)
         yaml_str = template.render(
             stack_name=stack_name,
             image_name=image_name,
@@ -142,7 +131,7 @@ class OpenStackConnector(BaseConnector):
         method: str,
         data: typing.Any,
         expect: typing.List[int],
-    ) -> OpenStackResponse:
+    ) -> AzureResponse:
         LOG.debug(f"[REQUEST] {method} {action} {data}")
         response = None
         try:
@@ -168,7 +157,7 @@ class OpenStackConnector(BaseConnector):
         result = self._request(action="stacks", method="GET", data={}, expect=[http.client.OK])
         return result.get("stacks", []) if result else []
 
-    def create_stack(
+    def create_deployment(
         self,
         tenant_name: str,
         stack_name: str,
@@ -180,59 +169,10 @@ class OpenStackConnector(BaseConnector):
         runtime: str,
         ports: str,
     ) -> str:
-        if self._test_responses:
-            id = str(uuid.uuid4())
-            time = datetime.datetime.now().isoformat()
-            new_stack = {
-                "id": id,
-                "stack_name": stack_name,
-                "creation_time": time,
-                "updated_time": time,
-                "stack_status": "created",
-                "description": "test stack",
-            }
-            self._test_responses.setdefault("stacks", []).append(new_stack)
-            return {"id": id, "links": []}
-        try:
-            template = self._get_stack_template(
-                stack_name,
-                image_name,
-                flavor_name,
-                key_name,
-                count,
-                job_id,
-                runtime,
-                ports,
-            )
-        except Exception as e:
-            LOG.error(f"Cannot read stack template: {e}, {traceback.format_exc()}")
-            return {}
-        LOG.debug("Heat stack template has been loaded")
-        result = self._request(action="stacks", method="POST", data=template, expect=[http.client.CREATED])
-        return result.get("stack", {}) if result else {}
+        return {}
 
     def get_stack(self, stack_id: str) -> typing.Dict[str, typing.Any]:
-        if "stacks" in self._test_responses:
-            for it in self.list_stacks():
-                if it["id"] == stack_id:
-                    return it
-            return {}
-        stacks = self.list_stacks()  # libcloud (tested on 1.7.0) fails to parse output if stack does not exist
-        if list(filter(lambda stack: stack.get("id") == stack_id or stack.get("stack_name") == stack_id, stacks)):
-            stack_info = self._request(action=f"stacks/{stack_id}", method="GET", data={}, expect=[http.client.OK])
-            return stack_info.get("stack", None) if stack_info else {}
         return {}
 
     def delete_stack(self, stack_id: str) -> str:
-        stack = self.get_stack(stack_id)
-        if not stack:
-            return f"Stack with id {stack_id} not found"
-        if self._test_responses:
-            for it in self._test_responses["stacks"]:
-                if it["id"] == stack_id:
-                    self._test_responses["stacks"].remove(it)
-                    break
-        else:
-            action = f'stacks/{stack["stack_name"]}/{stack_id}'
-            self._request(action=action, method="DELETE", data={}, expect=[http.client.NO_CONTENT])
         return "Deletion started"
