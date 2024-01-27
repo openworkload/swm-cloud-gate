@@ -1,48 +1,120 @@
-import datetime
 import http
 import logging
-import traceback
 import typing
-import uuid
 
 import jinja2
-import libcloud.security
 import yaml
-from libcloud.compute.providers import get_driver
-from libcloud.compute.types import Provider
+import json
+
+from azure.core.exceptions import HttpResponseError
+from azure.identity import CertificateCredential
+from azure.mgmt.resource import ResourceManagementClient
+from azure.mgmt.resource.resources.models import DeploymentMode
 
 from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
-TEMLPATE_FILE = "app/routers/azure/templates/partition.bicep"
+TEMLPATE_FILE = "app/routers/azure/templates/partition.json"
 CLOUD_INIT_SCRIPT_FILE = "app/routers/openstack/templates/cloud-init.sh"
-SERVICE_NAMES = {"compute": "nova", "orchestration": "heat", "rating": "cloudkitty"}
 
 
 class AzureConnector(BaseConnector):
-    def __init__(self, subscription_id: str, app_id: str, tenant_id: str, password: str):
-        self._init_driver(subscription_id, app_id, tenant_id, password)
+    def __init__(
+        self,
+        subscription_id: str,
+        tenant_id: str,
+        app_id: str,
+        key_file_path: str,
+        cert_file_path: str,
+    ) -> None:
+        self._init_azure_client(subscription_id, tenant_id, app_id, key_file_path, cert_file_path)
         super().__init__("azure")
 
-    def reinitialize(self, subscription_id: str, app_id: str, tenant_id: str, password: str) -> None:
-        self._init_driver(username, password, service)
+    def reinitialize(
+        self,
+        subscription_id: str,
+        tenant_id: str,
+        app_id: str,
+        key_file_path: str,
+        cert_file_path: str,
+    ) -> None:
+        self._init_azure_client(subscription_id, tenant_id, app_id, key_file_path, cert_file_path)
 
-    def _init_driver(self, subscription_id: str, app_id: str, tenant_id: str, password: str) -> None:
-        # See also https://libcloud.readthedocs.io/en/stable/compute/drivers/azure_arm.html
-        subscription_id='3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75',
-        app_id = '17e060c4-cb6e-47ac-a881-e55a4782a573',
-        tenant_id = 'c8d65d6a-d488-4dd9-9399-68f868316782',
-        key_file = '/opt/swm/spool/secure/cluster/private/key.pem',
-        if subscription_id and app_id and tenant_id and password:
-            https://libcloud.readthedocs.io/en/stable/compute/drivers/azure_arm.html
-            AzureDriver = get_driver(Provider.AZURE_ARM)
-            LOG.info("Connect to Azure")
-            self._driver = AzureDriver(
-                tenant_id = tenant_id,
-                subscription_id=subscription_id,
-                key=app_id,
-                key_file=key_file,
+    def _init_azure_client(
+        self,
+        subscription_id: str,
+        tenant_id: str,
+        app_id: str,
+        key_file_path: str,
+        cert_file_path: str,
+    ) -> None:
+        if subscription_id and tenant_id and app_id and cert_file_path and key_file_path:
+            pem_data = _get_pem_data(cert_file_path, key_file_path)
+            credential = CertificateCredential(
+                tenant_id=tenant_id,
+                client_id=app_id,
+                certificate_data=pem_data,
             )
+            self._client = ResourceManagementClient(credential, subscription_id)
+        else:
+            LOG.error("Not enough parameters provided to initialize Azure connection")
+
+    def _get_deployment_properties(self, job_id: str, flavor_name: str, os_version: str, username: str, user_pub_cert_path: str,) -> dict[str, dict[str, typing.Any]]:
+        with open(TEMLPATE_FILE) as template_file:
+            template = json.load(template_file)
+        template_parameters = self._get_template_parameters(job_id, flavor_name, os_version, username, user_pub_cert_path,)
+        LOG.debug(f"Template parameters for job {job_id}: {tempalte_parameters}")
+        return {
+            "properties": {
+                "template": template,
+                "parameters": template_parameters,
+                "mode": DeploymentMode.incremental,
+            }
+        }
+
+    def _get_template_parameters(self, job_id: str, flavor_name: str, os_version: str, username: str, user_pub_cert_path: str,) -> dict[str, str]:
+        return {
+            "resourcePrefix": {
+                "value": self._get_resource_prefix(job_id)
+            },
+            "adminUsername": {
+                "value": username
+            },
+            "adminPasswordOrKey": {
+                "value": self._get_vm_user_public_certificate(user_pub_cert_path)
+            },
+            "osVersion": {
+                "value": os_version
+            },
+            "vmSize": {
+                "value": flavor_name
+            },
+        }
+
+    def _read_template(self, template_path) -> str:
+        with open(template_path) as template_file:
+            return json.load(template_file)
+
+    def _get_vm_user_public_certificate(self, user_pub_cert_path: str) -> str:
+        with open(user_pub_cert_path, 'rb') as file:
+            pub_cert_content = file.read()
+        return pub_cert_content .decode("utf-8")
+
+    def _get_pem_data(self, cert_file_path: str, key_file_path: str) -> str:
+        with open(cert_path , 'rb') as file:
+            cert_content = file.read()
+        with open(key_file_path, 'rb') as file:
+            key_content = file.read()
+        return key_content + cert_content
+
+    def _get_resource_prefix(self, job_id: str) -> str:
+        return "swm-" + job_id.split("-")[0]
+
+    def _get_resource_group_name(self, resource_prefix: str) -> str:
+        return f'{resource_prefix}-resource-group'
+
+    def _get_deployment_name(self, resource_prefix: str) -> str:
+        return f'{resource_prefix}-deployment'
 
     def list_sizes(self) -> list[AzureNodeSize]:
         if "sizes" in self._test_responses:
@@ -63,11 +135,7 @@ class AzureConnector(BaseConnector):
                     )
                 )
             return node_sizes
-        try:
-            sizes = self._driver.list_sizes()
-            return sizes
-        except Exception as e:
-            LOG.error(f"Cannot list flavors: {e}")
+        # TODO
         return []
 
     def list_images(self):
@@ -78,32 +146,8 @@ class AzureConnector(BaseConnector):
                     NodeImage(id=it["id"], name=it["name"], extra={"status": it["status"]}, driver=self._driver)
                 )
             return node_images
-        return self._driver.list_images()
-
-    def _get_stack_template(
-        self,
-        stack_name: str,
-        image_name: str,
-        flavor_name: str,
-        key_name: str,
-        count: str,
-        job_id: str,
-        runtime: str,
-        ports: str,
-    ) -> str:
-        template_loader = jinja2.FileSystemLoader(searchpath="./")
-        template_env = jinja2.Environment(loader=template_loader, autoescape=True)
-        template = template_env.get_template(TEMLPATE_FILE)
-        yaml_str = template.render(
-            stack_name=stack_name,
-            image_name=image_name,
-            flavor_name=flavor_name,
-            key_name=key_name,
-            compute_instances_count=count,
-            ingres_tcp_ports=ports.split(","),
-            init_script=self._get_cloud_init_script(job_id, runtime),
-        )
-        return yaml.safe_load(yaml_str)
+        #TODO
+        return []
 
     def _get_cloud_init_script(self, job_id: str, runtime: str) -> str:
         runtime_params = self._get_runtime_params(runtime)
@@ -125,54 +169,54 @@ class AzureConnector(BaseConnector):
         LOG.debug(f"Runtime parameters parsed: {runtime_params}")
         return runtime_params
 
-    def _request(
-        self,
-        action: str,
-        method: str,
-        data: typing.Any,
-        expect: typing.List[int],
-    ) -> AzureResponse:
-        LOG.debug(f"[REQUEST] {method} {action} {data}")
-        response = None
-        try:
-            response = self._driver.connection.request(action=action, data=data, method=method)
-        except libcloud.common.exceptions.BaseHTTPError as e:
-            LOG.error(f"HTTP error: {e}")
-        if not response:
-            return None
-        result = response.parse_body()
-        status = response.status
-        if status not in expect:
-            LOG.info(f"Unexpected response status: {status}")
-            return None
-        LOG.debug(f"[RESPONSE]: {result}")
-        return result
-
     def list_stacks(self) -> typing.List[typing.Dict[str, typing.Any]]:
         if "stacks" in self._test_responses:
             stacks = []
             for it in self._test_responses["stacks"]:
                 stacks.append(it)
             return stacks
-        result = self._request(action="stacks", method="GET", data={}, expect=[http.client.OK])
-        return result.get("stacks", []) if result else []
+        # TODO
+        return []
 
     def create_deployment(
         self,
-        tenant_name: str,
-        stack_name: str,
-        image_name: str,
-        flavor_name: str,
-        key_name: str,
-        count: str,
         job_id: str,
+        location: str,
+        flavor_name: str,
+        os_version: str,
+        count: str,
         runtime: str,
         ports: str,
+        user_pub_cert_path: str,
     ) -> str:
-        return {}
+        #TODO use runtime, count and ports
+        resource_prefix = self._get_resource_prefix(job_id)
+        resource_group_name = self._get_resource_group_name(resource_prefix)
+        resource_group_creation_result = self._client.resource_groups.create_or_update(
+            resource_group_name,
+            {"location": location}
+        )
+        LOG.info(f"Provisioned resource group with ID: {resource_group_creation_result.id}")
+
+        deployment_name = self._get_deployment_name(resource_prefix)
+        deployment_properties = self._get_deployment_properties(job_id, flavor_name, os_version, username, user_pub_cert_path,)
+        deployment_async_operation = resource_client.deployments.begin_create_or_update(
+            resource_group_name,
+            deployment_name,
+            deployment_properties,
+        )
+        LOG.info(f"Deploying resource group {resource_group_name}, deployment: {deployment_name}")
+    try:
+        result = deployment_async_operation.result()
+        return result
+    except HttpResponseError as e:
+        LOG.error(f"Exception when deploying resources for job {job_id}: {e}")
+    return ""
 
     def get_stack(self, stack_id: str) -> typing.Dict[str, typing.Any]:
+        # TODO
         return {}
 
     def delete_stack(self, stack_id: str) -> str:
+        # TODO
         return "Deletion started"

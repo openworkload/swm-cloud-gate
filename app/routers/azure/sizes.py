@@ -2,8 +2,8 @@ import typing
 
 from fastapi import APIRouter, Header
 
-from .connector import AzureConnector
 from ..models import ImageInfo, convert_to_flavor
+from .connector import AzureConnector
 
 CONNECTOR = AzureConnector()
 EMPTY_HEADER = Header(None)

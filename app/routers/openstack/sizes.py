@@ -2,8 +2,8 @@ import typing
 
 from fastapi import APIRouter, Header
 
-from .connector import OpenStackConnector
 from ..models import ImageInfo, convert_to_flavor
+from .connector import OpenStackConnector
 
 CONNECTOR = OpenStackConnector()
 EMPTY_HEADER = Header(None)
