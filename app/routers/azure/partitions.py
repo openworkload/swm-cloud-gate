@@ -4,8 +4,8 @@ import typing
 
 from fastapi import APIRouter, Header, HTTPException
 
-from .connector import AzureConnector
 from ..models import PartInfo, convert_to_partition
+from .connector import AzureConnector
 
 CONNECTOR = AzureConnector()
 EMPTY_HEADER = Header(None)

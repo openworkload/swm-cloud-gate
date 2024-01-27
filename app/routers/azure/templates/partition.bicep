@@ -1,14 +1,12 @@
-// https://learn.microsoft.com/en-us/azure/virtual-machines/linux/quick-create-bicep?toc=%2Fazure%2Fazure-resource-manager%2Fbicep%2Ftoc.json&tabs=CLI
-
 metadata description = 'Creates a Sky Port partition resources'
 
 targetScope = 'resourceGroup'
 
-@description('The prefix name of all VMs in the partition.')
-param jobId string = 'foo'
+@description('The prefix name of all resources.')
+param resourcePrefix string
 
-@description('The prefix for VM names.')
-param vmName string = '${jobId}-main'
+@description('The main VM name.')
+param vmNameMain string = '${resourcePrefix}-main'
 
 @description('Admin username for all VMs.')
 param adminUsername string
@@ -25,7 +23,7 @@ param authenticationType string = 'sshPublicKey'
 param adminPasswordOrKey string
 
 @description('Unique DNS Name for the Public IP used to access the VM.')
-param dnsLabelPrefix string = toLower('${jobId}-main')
+param dnsLabelPrefix string = toLower('${resourcePrefix}-main')
 
 @description('The Linux version for the VM.')
 @allowed([
@@ -40,13 +38,13 @@ param location string = resourceGroup().location
 param vmSize string = 'Standard_B2s'
 
 @description('Name of the VNET')
-param virtualNetworkName string = 'vNet'
+param virtualNetworkName string = '${resourcePrefix}-vNet'
 
 @description('Name of the subnet in the virtual network')
 param subnetName string = 'Subnet'
 
 @description('Name of the Network Security Group')
-param networkSecurityGroupName string = 'SecGroupNet'
+param networkSecurityGroupName string = '${resourcePrefix}-secGroupNet'
 
 @description('Security Type of the VM.')
 @allowed([
@@ -63,8 +61,8 @@ var imageReference = {
     version: 'latest'
   }
 }
-var publicIPAddressName = '${jobId}PublicIP'
-var networkInterfaceName = '${jobId}NetInt'
+var publicIPAddressName = '${resourcePrefix}-PublicIP'
+var networkInterfaceName = '${resourcePrefix}-NetInt'
 var osDiskType = 'Standard_LRS'
 var subnetAddressPrefix = '10.0.0.0/24'
 var addressPrefix = '10.0.0.0/16'
@@ -179,7 +177,7 @@ resource publicIPAddress 'Microsoft.Network/publicIPAddresses@2021-05-01' = {
 var cloudInit = base64(loadTextContent('cloud-init.yaml'))
 
 resource vm 'Microsoft.Compute/virtualMachines@2021-11-01' = {
-  name: vmName
+  name: vmNameMain
   location: location
   properties: {
     hardwareProfile: {
@@ -202,7 +200,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2021-11-01' = {
       ]
     }
     osProfile: {
-      computerName: jobId
+      computerName: vmNameMain
       adminUsername: adminUsername
       adminPassword: adminPasswordOrKey
       linuxConfiguration: ((authenticationType == 'password') ? null : linuxConfiguration)

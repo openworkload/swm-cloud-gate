@@ -5,23 +5,22 @@
     "_generator": {
       "name": "bicep",
       "version": "0.24.24.22086",
-      "templateHash": "14759112998055445193"
+      "templateHash": "5609509695921055840"
     },
     "description": "Creates a Sky Port partition resources"
   },
   "parameters": {
-    "jobId": {
+    "resourcePrefix": {
       "type": "string",
-      "defaultValue": "foo",
       "metadata": {
-        "description": "The prefix name of all VMs in the partition."
+        "description": "The prefix name of all resources."
       }
     },
-    "vmName": {
+    "vmNameMain": {
       "type": "string",
-      "defaultValue": "[format('{0}-main', parameters('jobId'))]",
+      "defaultValue": "[format('{0}-main', parameters('resourcePrefix'))]",
       "metadata": {
-        "description": "The prefix for VM names."
+        "description": "The main VM name."
       }
     },
     "adminUsername": {
@@ -49,7 +48,7 @@
     },
     "dnsLabelPrefix": {
       "type": "string",
-      "defaultValue": "[toLower(format('{0}-main', parameters('jobId')))]",
+      "defaultValue": "[toLower(format('{0}-main', parameters('resourcePrefix')))]",
       "metadata": {
         "description": "Unique DNS Name for the Public IP used to access the VM."
       }
@@ -80,7 +79,7 @@
     },
     "virtualNetworkName": {
       "type": "string",
-      "defaultValue": "vNet",
+      "defaultValue": "[format('{0}-vNet', parameters('resourcePrefix'))]",
       "metadata": {
         "description": "Name of the VNET"
       }
@@ -94,7 +93,7 @@
     },
     "networkSecurityGroupName": {
       "type": "string",
-      "defaultValue": "SecGroupNet",
+      "defaultValue": "[format('{0}-secGroupNet', parameters('resourcePrefix'))]",
       "metadata": {
         "description": "Name of the Network Security Group"
       }
@@ -121,8 +120,8 @@
         "version": "latest"
       }
     },
-    "publicIPAddressName": "[format('{0}PublicIP', parameters('jobId'))]",
-    "networkInterfaceName": "[format('{0}NetInt', parameters('jobId'))]",
+    "publicIPAddressName": "[format('{0}-PublicIP', parameters('resourcePrefix'))]",
+    "networkInterfaceName": "[format('{0}-NetInt', parameters('resourcePrefix'))]",
     "osDiskType": "Standard_LRS",
     "subnetAddressPrefix": "10.0.0.0/24",
     "addressPrefix": "10.0.0.0/16",
@@ -251,7 +250,7 @@
     {
       "type": "Microsoft.Compute/virtualMachines",
       "apiVersion": "2021-11-01",
-      "name": "[parameters('vmName')]",
+      "name": "[parameters('vmNameMain')]",
       "location": "[parameters('location')]",
       "properties": {
         "hardwareProfile": {
@@ -274,7 +273,7 @@
           ]
         },
         "osProfile": {
-          "computerName": "[parameters('jobId')]",
+          "computerName": "[parameters('vmNameMain')]",
           "adminUsername": "[parameters('adminUsername')]",
           "adminPassword": "[parameters('adminPasswordOrKey')]",
           "linuxConfiguration": "[if(equals(parameters('authenticationType'), 'password'), null(), variables('linuxConfiguration'))]",
@@ -290,7 +289,7 @@
       "condition": "[and(equals(parameters('securityType'), 'TrustedLaunch'), and(equals(variables('securityProfileJson').uefiSettings.secureBootEnabled, true()), equals(variables('securityProfileJson').uefiSettings.vTpmEnabled, true())))]",
       "type": "Microsoft.Compute/virtualMachines/extensions",
       "apiVersion": "2022-03-01",
-      "name": "[format('{0}/{1}', parameters('vmName'), variables('extensionName'))]",
+      "name": "[format('{0}/{1}', parameters('vmNameMain'), variables('extensionName'))]",
       "location": "[parameters('location')]",
       "properties": {
         "publisher": "[variables('extensionPublisher')]",
@@ -308,7 +307,7 @@
         }
       },
       "dependsOn": [
-        "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+        "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmNameMain'))]"
       ]
     }
   ],

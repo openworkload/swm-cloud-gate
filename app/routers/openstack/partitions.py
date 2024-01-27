@@ -4,8 +4,8 @@ import typing
 
 from fastapi import APIRouter, Header, HTTPException
 
-from .connector import OpenStackConnector
 from ..models import PartInfo, convert_to_partition
+from .connector import OpenStackConnector
 
 CONNECTOR = OpenStackConnector()
 EMPTY_HEADER = Header(None)
