@@ -43,4 +43,5 @@ requirements.txt: requirements.in
 
 .PHONY: azure-build-bicep
 azure-build-bicep:
+	. $(VENV_BIN)/activate
 	az bicep build -f ./app/routers/azure/templates/partition.bicep --outdir ./app/routers/azure/templates/

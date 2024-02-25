@@ -27,9 +27,9 @@ param dnsLabelPrefix string = toLower('${resourcePrefix}-main')
 
 @description('The Linux version for the VM.')
 @allowed([
-  'Ubuntu-2204'
+  'Ubuntu-2204-swm'
 ])
-param osVersion string = 'Ubuntu-2204'
+param osVersion string = 'Ubuntu-2204-swm'
 
 @description('Location for all resources.')
 param location string = resourceGroup().location
@@ -51,14 +51,11 @@ param networkSecurityGroupName string = '${resourcePrefix}-secGroupNet'
   'Standard'
   'TrustedLaunch'
 ])
-param securityType string = 'TrustedLaunch'
+param securityType string = 'Standard'
 
 var imageReference = {
-  'Ubuntu-2204': {
-    publisher: 'Canonical'
-    offer: '0001-com-ubuntu-server-jammy'
-    sku: '22_04-lts-gen2'
-    version: 'latest'
+  'Ubuntu-2204-swm': {
+    id: '/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/swmImages/providers/Microsoft.Compute/images/ubuntu-22.04-swm'
   }
 }
 var publicIPAddressName = '${resourcePrefix}-PublicIP'
