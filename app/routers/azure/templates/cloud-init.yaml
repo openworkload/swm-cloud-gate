@@ -1,0 +1,6 @@
+#cloud-config
+runcmd: |+
+    #!/bin/bash -ex
+
+    echo "Hello Sky Port" > /tmp/hello.log
+    exit 0

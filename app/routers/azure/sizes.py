@@ -3,14 +3,14 @@ import typing
 from fastapi import APIRouter, Header
 
 from ..models import ImageInfo, convert_to_flavor
-from .connector import OpenStackConnector
+from .connector import AzureConnector
 
-CONNECTOR = OpenStackConnector()
+CONNECTOR = AzureConnector()
 EMPTY_HEADER = Header(None)
 ROUTER = APIRouter()
 
 
-@ROUTER.get("/openstack/flavors")
+@ROUTER.get("/azure/flavors")
 async def list_flavors(username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "compute")
     flavor_list: typing.List[ImageInfo] = []

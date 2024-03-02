@@ -33,14 +33,14 @@ class OpenStackConnector(BaseConnector):
     def _init_driver(self, username: str, password: str, service: str) -> None:
         # See also https://libcloud.readthedocs.io/en/stable/compute/drivers/openstack.html
         if username and password and service:
-            libcloud.security.VERIFY_SSL_CERT = False  # FIXME: use SSL connection
+            libcloud.security.VERIFY_SSL_CERT = False
             OpenStack = get_driver(Provider.OPENSTACK)
             url = "http://172.28.128.254:5000"
             LOG.info(f"Connect to OpenStack: {url}")
             self._driver = OpenStack(
                 username,
                 password,
-                ex_tenant_name="demo1",  # TODO: pass real tenant name
+                ex_tenant_name="demo1",
                 ex_domain_name="Default",
                 ex_force_service_type=service,
                 ex_force_service_name=SERVICE_NAMES[service],
