@@ -1,5 +1,20 @@
 #!/bin/bash -ex
 
+function download_swm_worker() {
+    if [[ {{ swm_source }} == "https://*.tar.gz" ]]; then
+        swm_url={{ swm_source }}
+        echo $(date) ": ensure swm worker is installed from ${swm_url}"
+        target_directory="/opt/swm"
+        mkdir -p "$target_directory"
+        wget "$swm_url" -O "$target_directory/swm-worker.tar.gz"
+        tar -xzf "$target_directory/swm-worker.tar.gz" -C "$target_directory"
+        rm "$target_directory/swm-worker.tar.gz"
+    else
+        echo "ERROR: unsupported swm-worker source: {{ swm_source }}"
+        exit 1
+    fi
+}
+
 GATEWAY_IP=$(ip -4 addr show $(ip -4 route list 0/0 | awk -F' ' '{ print $5 }') | grep -oP "(?<=inet\\s)\\d+(\\.\\d+){3}")
 IS_MAIN=true
 echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$GATEWAY_IP, master: ${IS_MAIN})"
@@ -11,12 +26,6 @@ echo $(date) ": hostname=$(hostname)"
 echo $GATEWAY_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
 echo $(date) ": /etc/hosts:"
 cat /etc/hosts
-echo
-
-# FIXME: re-configure openstack to get rid of this domain
-sed -i -n "/openstacklocal/!p" /etc/resolv.conf
-echo $(date) ": /etc/resolv.conf:"
-cat /etc/resolv.conf
 echo
 
 # Fix docker connections failures
@@ -53,24 +62,7 @@ else
 fi
 echo
 
-echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source }}"
-TMP_DIR=$(mktemp -d -t swm-worker-XXXXX)
-if [[ ! "$TMP_DIR" || ! -d "$TMP_DIR" ]]; then
-    echo "Could not create temporary directory"
-    exit 1
-fi
-function cleanup {
-    rm -rf "$TMP_DIR"
-    echo "Deleted temporary directory $TMP_DIR"
-}
-trap cleanup EXIT
-pushd $TMP_DIR
-if [[ {{ swm_source }} == "http://*.tar.gz" ]]; then
-    wget {{ swm_source }} --output-document=swm-worker.tar.gz
-    mkdir -p /opt/swm
-    tar zfx ./swm-worker.tar.gz --directory /opt/swm/
-fi
-popd
+download_swm_worker()
 
 echo SWM_SNAME=$HOST_NAME > /etc/swm.conf
 echo $(date) ": /etc/swm.conf:"
