@@ -101,6 +101,7 @@ class OpenStackConnector(BaseConnector):
         job_id: str,
         runtime: str,
         ports: str,
+        container_image: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader, autoescape=True)
@@ -112,11 +113,11 @@ class OpenStackConnector(BaseConnector):
             key_name=key_name,
             compute_instances_count=count,
             ingres_tcp_ports=ports.split(","),
-            init_script=self._get_cloud_init_script(job_id, runtime),
+            init_script=self._get_cloud_init_script(job_id, runtime, container_image),
         )
         return yaml.safe_load(yaml_str)
 
-    def _get_cloud_init_script(self, job_id: str, runtime: str) -> str:
+    def _get_cloud_init_script(self, job_id: str, runtime: str, contianer_image: str) -> str:
         runtime_params = self._get_runtime_params(runtime)
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader, autoescape=True)
@@ -124,6 +125,8 @@ class OpenStackConnector(BaseConnector):
         script: str = template.render(
             job_id=job_id,
             swm_source=runtime_params.get("swm_source"),
+            ssh_pub_key=runtime_params.get("ssh_pub_key"),
+            container_image=contianer_image,
         )
         return script
 
@@ -131,7 +134,7 @@ class OpenStackConnector(BaseConnector):
         runtime_params: dict[str, str] = {}
         LOG.debug(f"Runtime parameters string: {runtime}")
         for it in runtime.split(","):
-            [key, value] = it.split("=")
+            [key, value] = it.split("=", 1)
             runtime_params[key] = value
         LOG.debug(f"Runtime parameters parsed: {runtime_params}")
         return runtime_params
@@ -179,6 +182,7 @@ class OpenStackConnector(BaseConnector):
         job_id: str,
         runtime: str,
         ports: str,
+        container_image: str,
     ) -> str:
         if self._test_responses:
             id = str(uuid.uuid4())
@@ -203,6 +207,7 @@ class OpenStackConnector(BaseConnector):
                 job_id,
                 runtime,
                 ports,
+                container_image,
             )
         except Exception as e:
             LOG.error(f"Cannot read stack template: {e}, {traceback.format_exc()}")

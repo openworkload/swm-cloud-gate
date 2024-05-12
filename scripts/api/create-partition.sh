@@ -18,8 +18,9 @@ HEADER7="flavorname: m1.micro"
 HEADER8="keyname: demo1"
 HEADER9="count: 0"
 HEADER10="jobid: 3579a076-9924-11ee-ba53-a3132f7ae2fb"
-HEADER11="runtime: swm_source=http://10.0.2.15/swm-worker.tar.gz"
+HEADER11="runtime: swm_source=ssh, ssh_pub_key=ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA7GA+EAxXl5e7P1FEQOxRwwGroxj4x9G0GKHipGcjaM3PFZ3mONNO7GI3rfK97gB3aRiopePZGYpOfzifq5nfLWvl7gq77UkQd+fZffxrkCprtaA8/VELMZLuvfeJS2PFiF/XugeMjgm+KYVVhL2nYhSuSVO7XCPOd4TmKIBdjvtlIfpMWkaDwZjz+uq4qsDfHBIC+iDXPajXG38Q3aXxQJ3wUhYiTC65gRYmP0a47cCyikudu8AgoCvsiBd6i9oBUucf9c3DzaU3TqakRlNbypMFBftiNIj1VTWVZ5524U8Dug/huESE03C1fdTzXjym2OtadhYaCPfYfLkU/WGUIQ== taras@iclouds.net"
 HEADER12="ports: 10001,10022"
+HEADER13="containerimage: 172.28.128.2:6006/jupyter/datascience-notebook:hub-3.1.1"
 URL="https://${HOST}:${PORT}/openstack/partitions"
 
 curl --request ${REQUEST}\
@@ -38,5 +39,6 @@ curl --request ${REQUEST}\
      --header "${HEADER10}"\
      --header "${HEADER11}"\
      --header "${HEADER12}"\
+     --header "${HEADER13}"\
      ${URL}
 echo
