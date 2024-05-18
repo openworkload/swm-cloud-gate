@@ -121,16 +121,20 @@ function setup_mounts() {
     echo
 }
 
-function setup_docker() {
-    echo $(date) ": install and configure docker"
+function install_packages() {
+    echo $(date) ": install packages"
 
     apt-get --yes update
     apt-get --yes install docker docker.io
     apt-get --yes install cgroupfs-mount
+    apt-get --yes install net-tools  # wm_docker.erl uses route utility
+}
+
+function setup_docker() {
+    echo $(date) ": setup docker"
 
     # swm connects to docker via tcp => enable this port listening in the docker daemon:
     sed -i '/^ExecStart/s/$/ -H tcp:\/\/127.0.0.1:6000 --insecure-registry 172.28.128.2:6006/' /lib/systemd/system/docker.service
-    #sed -i '/^ExecStart/s/$/ -H tcp:\/\/127.0.0.1:6000/' /lib/systemd/system/docker.service
     systemctl daemon-reload
 
     # Fix docker connections failures
@@ -139,9 +143,6 @@ function setup_docker() {
     echo $(date) ": 99-default.link:"
     cat /lib/systemd/network/99-default.link
     echo
-
-    # Local test docker registry in OpenStack is insecure:
-    #echo '{"insecure-registries": ["172.28.128.2:6006"]}' > /etc/docker/daemon.json
 
     systemctl enable docker
     systemctl restart docker
@@ -157,6 +158,7 @@ function pull_container_image() {
 
 setup_network
 setup_mounts
+install_packages
 setup_docker
 pull_container_image
 download_swm_worker
