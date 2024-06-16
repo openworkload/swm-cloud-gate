@@ -1,17 +1,5 @@
 #!/bin/bash -ex
 
-function ensure_sshd_running() {
-    if [ ! `pgrep sshd` ]; then
-        if [ ! -e /run/sshd ]; then
-            local sshd_run_dir="/run/sshd"
-            echo "$(date): create directory $sshd_run_dir"
-            mkdir $sshd_run_dir
-        fi
-        echo "$(date): start sshd"
-        /usr/sbin/sshd
-    fi
-}
-
 function download_swm_worker() {
     echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source }}"
 
@@ -24,8 +12,6 @@ function download_swm_worker() {
         local file_path="$target_directory/swm-worker.tar.gz"
 
         mkdir -p "$target_directory"
-
-        ensure_sshd_running
 
         while true; do
             if [[ -f "$file_path" ]]; then
