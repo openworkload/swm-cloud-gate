@@ -26,6 +26,7 @@ async def create_partition(
     jobid: str = EMPTY_HEADER,
     runtime: str = EMPTY_HEADER,
     ports: str = EMPTY_HEADER,
+    containerimage: str = EMPTY_HEADER,
 ):
     CONNECTOR.reinitialize(username, password, "orchestration")
     result = CONNECTOR.create_stack(
@@ -38,6 +39,7 @@ async def create_partition(
         jobid,
         runtime,
         ports,
+        containerimage,
     )
     LOG.info(f"Create OpenStack partition {partname} for tenant {tenantname}, job id: {jobid}")
     LOG.debug(f"Partition {partname} creation options:")
@@ -48,6 +50,7 @@ async def create_partition(
     LOG.debug(f" * extra nodes: {count}")
     LOG.debug(f" * runtime: {runtime}")
     LOG.debug(f" * ports: {ports}")
+    LOG.debug(f" * container image: {containerimage}")
     return {"partition": result}
 
 
