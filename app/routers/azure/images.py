@@ -3,8 +3,9 @@ import typing
 
 from fastapi import APIRouter, Header, HTTPException
 
-from ..models import ImageInfo, convert_to_image
+from ..models import ImageInfo
 from .connector import AzureConnector
+from .converters import convert_to_image
 
 CONNECTOR = AzureConnector()
 EMPTY_HEADER = Header(None)

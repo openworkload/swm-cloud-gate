@@ -21,6 +21,7 @@ check:
 
 .PHONY: format
 format:
+	. $(VENV_BIN)/activate
 	$(VENV_BIN)/autoflake -i -r --ignore-init-module-imports app test
 	$(VENV_BIN)/isort --gitignore app test
 	$(VENV_BIN)/black --exclude .venv app test
