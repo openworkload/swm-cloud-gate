@@ -6,6 +6,8 @@ import jinja2
 import yaml
 from azure.core.exceptions import HttpResponseError
 from azure.identity import CertificateCredential
+from azure.mgmt.compute import ComputeManagementClient
+from azure.mgmt.compute.models import VirtualMachineImage, VirtualMachineSize
 from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.resource.resources.models import DeploymentMode
 
@@ -17,15 +19,7 @@ CLOUD_INIT_SCRIPT_FILE = "app/routers/openstack/templates/cloud-init.sh"
 
 
 class AzureConnector(BaseConnector):
-    def __init__(
-        self,
-        subscription_id: str,
-        tenant_id: str,
-        app_id: str,
-        key_file_path: str,
-        cert_file_path: str,
-    ) -> None:
-        self._init_azure_client(subscription_id, tenant_id, app_id, key_file_path, cert_file_path)
+    def __init__(self) -> None:
         super().__init__("azure")
 
     def reinitialize(
@@ -33,27 +27,25 @@ class AzureConnector(BaseConnector):
         subscription_id: str,
         tenant_id: str,
         app_id: str,
-        key_file_path: str,
-        cert_file_path: str,
+        pem_data: bytes,
     ) -> None:
-        self._init_azure_client(subscription_id, tenant_id, app_id, key_file_path, cert_file_path)
+        self._init_azure_clients(subscription_id, tenant_id, app_id, pem_data)
 
-    def _init_azure_client(
+    def _init_azure_clients(
         self,
         subscription_id: str,
         tenant_id: str,
         app_id: str,
-        key_file_path: str,
-        cert_file_path: str,
+        pem_data: bytes,
     ) -> None:
-        if subscription_id and tenant_id and app_id and cert_file_path and key_file_path:
-            pem_data = _get_pem_data(cert_file_path, key_file_path)
+        if subscription_id and tenant_id and app_id and len(pem_data):
             credential = CertificateCredential(
                 tenant_id=tenant_id,
                 client_id=app_id,
                 certificate_data=pem_data,
             )
-            self._client = ResourceManagementClient(credential, subscription_id)
+            self._compute_client = ComputeManagementClient(credential, subscription_id)
+            self._resource_client = ResourceManagementClient(credential, subscription_id)
         else:
             LOG.error("Not enough parameters provided to initialize Azure connection")
 
@@ -124,41 +116,47 @@ class AzureConnector(BaseConnector):
     def _get_deployment_name(self, resource_prefix: str) -> str:
         return f"{resource_prefix}-deployment"
 
-    def list_sizes(self) -> list[AzureNodeSize]:
+    def list_sizes(self, location: str) -> list[VirtualMachineSize]:
         if "sizes" in self._test_responses:
             node_sizes = []
             for it in self._test_responses["sizes"]:
                 node_sizes.append(
-                    AzureNodeSize(
-                        id=it["id"],
+                    VirtualMachineSize(
                         name=it["name"],
-                        bandwidth=it["bandwidth"],
-                        ram=it["ram"],
-                        disk=it["disk"],
-                        price=it["price"],
-                        vcpus=it["vcpus"],
-                        ephemeral_disk=it["ephemeral_disk"],
-                        swap=it["swap"],
-                        driver=self._driver,
+                        number_of_cores=it["number_of_cores"],
+                        os_disk_size_in_mb=it["os_disk_size_in_mb"],
+                        resource_disk_size_in_mb=it["resource_disk_size_in_mb"],
+                        memory_in_mb=it["memory_in_mb"],
+                        max_data_disk_count=it["max_data_disk_count"],
                     )
                 )
             return node_sizes
-        # TODO
-        return []
+        return list(self._compute_client.virtual_machine_sizes.list(location))
 
-    def list_images(self) -> list[ImageInfo]:
-        node_images: list[ImageInfo] = []
+    def list_images(self) -> list[VirtualMachineImage]:
+        node_images: list[VirtualMachineImage] = []
         if "images" in self._test_responses:
             for it in self._test_responses["images"]:
                 node_images.append(
-                    ImageInfo(id=it["id"], name=it["name"], status=it["status"], created=it["created"], updated=it["updated"],)
+                    VirtualMachineImage(
+                        id=it["id"],
+                        name=it["name"],
+                        location=it["location"],
+                        publichser=it["publisher"],
+                        offer=it["offer"],
+                        sku=it["sku"],
+                        version=it["version"],
+                        plan=it["plan"],
+                        os_disk_image=it["os_disk_image"],
+                        data_disk_images=it["data_disk_images"],
+                        automatic_os_upgrade_properties=it["automatic_os_upgrade_properties"],
+                        hyper_vgeneration=it["hyper_vgeneration"],
+                        features=it["features"],
+                    )
                 )
         else:
-            azure_images = self._client.virtual_machine_images.list(
-                location=location,
-                publisher_name=publisher_name,
-                offer=offer,
-                skus=skus
+            azure_images = self._compute_client.virtual_machine_images.list(
+                location=location, publisher_name=publisher_name, offer=offer, skus=skus
             )
             for azure_image in azure_images:
                 images.append(azure_image.name)
@@ -207,7 +205,7 @@ class AzureConnector(BaseConnector):
         # TODO use runtime, count and ports
         resource_prefix = self._get_resource_prefix(job_id)
         resource_group_name = self._get_resource_group_name(resource_prefix)
-        resource_group_creation_result = self._client.resource_groups.create_or_update(
+        resource_group_creation_result = self._resource_client.resource_groups.create_or_update(
             resource_group_name, {"location": location}
         )
         LOG.info(f"Provisioned resource group with ID: {resource_group_creation_result.id}")
@@ -227,12 +225,11 @@ class AzureConnector(BaseConnector):
         )
         LOG.info(f"Deploying resource group {resource_group_name}, deployment: {deployment_name}")
 
-    try:
-        result = deployment_async_operation.result()
-        return result
-    except HttpResponseError as e:
-        LOG.error(f"Exception when deploying resources for job {job_id}: {e}")
-    return ""
+        try:
+            return deployment_async_operation.result()
+        except HttpResponseError as e:
+            LOG.error(f"Exception when deploying resources for job {job_id}: {e}")
+        return ""
 
     def get_stack(self, stack_id: str) -> typing.Dict[str, typing.Any]:
         # TODO
