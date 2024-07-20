@@ -258,9 +258,10 @@ class AzureConnector(BaseConnector):
         # TODO
         return {}
 
-    def delete_stack(self, stack_id: str) -> str:
-        # TODO
-        return "Deletion started"
+    def delete_resource_group(self, resource_group_name: str) -> str | None:
+        if delete_async_operation := self._resource_client.resource_groups.begin_delete(resource_group_name):
+            return "Deletion started"
+        return None
 
     def find_image(
         self, location: str, publisher: str, offer: str, sku: str, version: str
