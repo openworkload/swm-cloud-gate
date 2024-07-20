@@ -2,9 +2,9 @@ import http
 import logging
 import typing
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Body, Header, HTTPException
 
-from ..models import PartInfo
+from ..models import HttpBody, PartInfo
 from .connector import AzureConnector
 from .converters import convert_to_partition
 
@@ -12,6 +12,7 @@ CONNECTOR = AzureConnector()
 EMPTY_HEADER = Header(None)
 LOG = logging.getLogger("swm")
 ROUTER = APIRouter()
+EMPTY_BODY = Body(None)
 
 
 @ROUTER.post("/azure/partitions")
@@ -76,8 +77,17 @@ async def get_partition_info(id: str, username: str = EMPTY_HEADER, password: st
     return convert_to_partition(stack)
 
 
-@ROUTER.delete("/azure/partitions/{id}")
-async def delete_partition(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
-    CONNECTOR.reinitialize(username, password, "orchestration")
-    result = CONNECTOR.delete_stack(id)
-    return {"result": result}
+@ROUTER.delete("/azure/partitions//subscriptions/{subscriptionid}/resourceGroups/{partitionname}")
+async def delete_partition(
+    subscriptionid: str,
+    partitionname: str,
+    tenantid: str = EMPTY_HEADER,
+    appid: str = EMPTY_HEADER,
+    body: HttpBody = EMPTY_BODY,
+):
+    try:
+        CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
+        result = CONNECTOR.delete_resource_group(partitionname)
+        return {"result": result}
+    except Exception as e:
+        return {"error": str(e)}

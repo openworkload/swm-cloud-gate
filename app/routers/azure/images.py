@@ -13,7 +13,7 @@ ROUTER = APIRouter()
 
 
 @ROUTER.get(
-    "/azure/images/Subscriptions/{subscriptionid}/Providers/Microsoft.Compute"
+    "/azure/images//Subscriptions/{subscriptionid}/Providers/Microsoft.Compute"
     "/Locations/{location}/Publishers/{publisher}/ArtifactTypes/VMImage"
     "/Offers/{offer}/Skus/{sku}/Versions/{version}"
 )
