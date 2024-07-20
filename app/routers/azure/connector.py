@@ -133,7 +133,7 @@ class AzureConnector(BaseConnector):
             return node_sizes
         return list(self._compute_client.virtual_machine_sizes.list(location))
 
-    def list_images(self) -> list[VirtualMachineImage]:
+    def list_images(self, location: str, publisher: str, offer: str, skus: str) -> list[VirtualMachineImage]:
         node_images: list[VirtualMachineImage] = []
         if "images" in self._test_responses:
             for it in self._test_responses["images"]:
@@ -144,7 +144,7 @@ class AzureConnector(BaseConnector):
                         location=it["location"],
                         publichser=it["publisher"],
                         offer=it["offer"],
-                        sku=it["sku"],
+                        skus=it["skus"],
                         version=it["version"],
                         plan=it["plan"],
                         os_disk_image=it["os_disk_image"],
@@ -154,13 +154,36 @@ class AzureConnector(BaseConnector):
                         features=it["features"],
                     )
                 )
+            return node_images
+        LOG.debug(f"List images: location={location}, publisher={publisher}, offer={offer}, skus={skus}")
+        if skus:
+            if azure_image := self._get_latest_sku_image(location, publisher, offer, skus):
+                node_images.append(azure_image)
         else:
-            azure_images = self._compute_client.virtual_machine_images.list(
-                location=location, publisher_name=publisher_name, offer=offer, skus=skus
+            azure_skus = self._compute_client.virtual_machine_images.list_skus(
+                location=location,
+                publisher_name=publisher,
+                offer=offer,
             )
-            for azure_image in azure_images:
-                images.append(azure_image.name)
-        return images
+            for sku in azure_skus:
+                if azure_image := self._get_latest_sku_image(location, publisher, offer, sku.name):
+                    node_images.append(azure_image)
+        return node_images
+
+    def _get_latest_sku_image(self, location: str, publisher: str, offer: str, sku: str) -> VirtualMachineImage | None:
+        max_date_image: VirtualMachineImage | None = None
+        max_date = ""
+        for azure_image in self._compute_client.virtual_machine_images.list(
+            location=location,
+            publisher_name=publisher,
+            offer=offer,
+            skus=sku,
+        ):
+            if azure_image.name > max_date:
+                max_date_image = azure_image
+        if max_date_image:
+            max_date_image.extra: dict[str, str] = {"sku": sku, "publisher": publisher, "offer": offer}
+        return max_date_image
 
     def _get_cloud_init_script(self, job_id: str, runtime: str) -> str:
         runtime_params = self._get_runtime_params(runtime)
@@ -238,3 +261,18 @@ class AzureConnector(BaseConnector):
     def delete_stack(self, stack_id: str) -> str:
         # TODO
         return "Deletion started"
+
+    def find_image(
+        self, location: str, publisher: str, offer: str, sku: str, version: str
+    ) -> VirtualMachineImage | None:
+        if azure_image := self._compute_client.virtual_machine_images.get(
+            location=location,
+            publisher_name=publisher,
+            offer=offer,
+            skus=sku,
+            version=version,
+        ):
+
+            azure_image.extra: dict[str, str] = {"sku": sku, "publisher": publisher, "offer": offer, "version": version}
+            return azure_image
+        return None

@@ -15,13 +15,12 @@ ROUTER = APIRouter()
 @ROUTER.get("/openstack/images/{id}")
 async def get_image_info(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "compute")
-    image = CONNECTOR.find_image(id)
-    if not image:
-        raise HTTPException(
-            status_code=http.client.NOT_FOUND,
-            detail="Image not found",
-        )
-    return convert_to_image(image)
+    if image := CONNECTOR.find_image(id):
+        return convert_to_image(image)
+    raise HTTPException(
+        status_code=http.client.NOT_FOUND,
+        error="Image not found",
+    )
 
 
 @ROUTER.get("/openstack/images")

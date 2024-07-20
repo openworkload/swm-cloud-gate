@@ -1,9 +1,6 @@
-import typing
-
 from fastapi import APIRouter, Body, Header
-from pydantic import BaseModel
 
-from ..models import ImageInfo
+from ..models import HttpBody, ImageInfo
 from .connector import AzureConnector
 from .converters import convert_to_flavor
 
@@ -13,20 +10,16 @@ EMPTY_HEADER = Header(None)
 EMPTY_BODY = Body(None)
 
 
-class Body(BaseModel):
-    pem_data: bytes
-
-
 @ROUTER.get("/azure/flavors")
 async def list_flavors(
     subscriptionid: str = EMPTY_HEADER,
     tenantid: str = EMPTY_HEADER,
     appid: str = EMPTY_HEADER,
     location: str = EMPTY_HEADER,
-    body: Body = EMPTY_BODY,
-):
+    body: HttpBody = EMPTY_BODY,
+) -> dict[str, str | list[ImageInfo]]:
     CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
-    flavor_list: typing.List[ImageInfo] = []
+    flavor_list: list[ImageInfo] = []
     try:
         if sizes := CONNECTOR.list_sizes(location):
             for item in sizes:

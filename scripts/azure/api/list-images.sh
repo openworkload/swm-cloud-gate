@@ -8,6 +8,11 @@ KEY=~/.swm/key.pem
 CA=/opt/swm/spool/secure/cluster/ca-chain-cert.pem
 PEM_DATA=$(make_pem_data $CERT $KEY)
 
+LOCATION=eastus
+PUBLISHER=Canonical
+OFFER=0001-com-ubuntu-server-jammy
+#SKUS=22_04-lts
+
 PORT=8444
 HOST=$(hostname -s)
 
@@ -17,7 +22,10 @@ HEADER2="subscriptionid: ${SUBSCRIPTION_ID}"
 HEADER3="tenantid: ${TENANT_ID}"
 HEADER4="appid: ${APP_ID}"
 HEADER5="location: ${LOCATION}"
-URL="https://${HOST}:${PORT}/azure/flavors"
+HEADER6="publisher: ${PUBLISHER}"
+HEADER7="offer: ${OFFER}"
+HEADER8="skus: ${SKUS}"
+URL="https://${HOST}:${PORT}/azure/images"
 BODY='{"pem_data": '${PEM_DATA}'}'
 
 json=$(curl --request ${REQUEST}\
@@ -29,17 +37,10 @@ json=$(curl --request ${REQUEST}\
      --header "${HEADER3}"\
      --header "${HEADER4}"\
      --header "${HEADER5}"\
+     --header "${HEADER6}"\
+     --header "${HEADER7}"\
+     --header "${HEADER8}"\
      --data-raw "${BODY}" \
      ${URL} 2>/dev/null)
 
-table=$(echo "$json" | jq -r '.flavors[] | [.id, .name, .cpus] | @tsv')
-
-id_width=$(echo "$table" | awk -F'\t' '{print length($1)}' | sort -nr | head -1)
-name_width=$(echo "$table" | awk -F'\t' '{print length($2)}' | sort -nr | head -1)
-cpus_width=$(echo "$table" | awk -F'\t' '{print length($3)}' | sort -nr | head -1)
-
-printf "%-${id_width}s  %-${name_width}s %-${cpus_width}s\n" "ID" "Name" "CPUs"
-printf "%${id_width}s  %${name_width}s %${cpus_width}s\n" "$(printf '%*s' "$id_width" | tr ' ' '-')" "$(printf '%*s' "$name_width" | tr ' ' '-')" "$(printf '%*s' "$cpus_width" | tr ' ' '-')"
-echo "$table" | while IFS=$'\t' read -r id name; do
-    printf "%-${id_width}s  %-${name_width}s %-${cpus_width}s\n" "$id" "$name" "$cpus"
-done
+echo $json
