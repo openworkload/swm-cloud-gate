@@ -8,6 +8,8 @@ KEY=~/.swm/key.pem
 CA=/opt/swm/spool/secure/cluster/ca-chain-cert.pem
 PEM_DATA=$(make_pem_data $CERT $KEY)
 
+LOCATION="eastus"
+
 PORT=8444
 HOST=$(hostname -s)
 

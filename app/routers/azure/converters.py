@@ -23,7 +23,16 @@ def convert_to_flavor(data: VirtualMachineSize) -> Flavor:
 
 
 def convert_to_image(data: VirtualMachineImage) -> ImageInfo:
-    return ImageInfo(id=data.id, name=data.name)
+    image = ImageInfo(
+        id=data.id,
+        name=data.name,
+        extra={"tags": data.tags, "location": data.location},
+    )
+    for name, value in data.additional_properties.items():
+        image.extra[name] = value
+    for name, value in data.extra.items():
+        image.extra[name] = value
+    return image
 
 
 def convert_to_partition(data: typing.Dict[str, typing.Any]) -> PartInfo:

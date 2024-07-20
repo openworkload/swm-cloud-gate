@@ -18,9 +18,7 @@ class PartInfo(BaseModel):
 class ImageInfo(BaseModel):
     id: str
     name: str
-    status: typing.Optional[str] = None
-    created: typing.Optional[str] = None
-    updated: typing.Optional[str] = None
+    extra: dict[str, typing.Any] = {}
 
 
 class Flavor(BaseModel):
@@ -30,3 +28,7 @@ class Flavor(BaseModel):
     mem: int
     storage: int
     price: float
+
+
+class HttpBody(BaseModel):
+    pem_data: bytes
