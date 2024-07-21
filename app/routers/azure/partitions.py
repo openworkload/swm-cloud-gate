@@ -1,4 +1,3 @@
-import http
 import logging
 import traceback
 import typing
@@ -18,40 +17,47 @@ EMPTY_BODY = Body(None)
 
 @ROUTER.post("/azure/partitions")
 async def create_partition(
-    username: str = EMPTY_HEADER,
-    password: str = EMPTY_HEADER,
-    tenantname: str = EMPTY_HEADER,
-    partname: str = EMPTY_HEADER,
-    imagename: str = EMPTY_HEADER,
+    subscriptionid: str = EMPTY_HEADER,
+    tenantid: str = EMPTY_HEADER,
+    appid: str = EMPTY_HEADER,
+    vmimage: str = EMPTY_HEADER,
+    containerimage: str = EMPTY_HEADER,
     flavorname: str = EMPTY_HEADER,
-    keyname: str = EMPTY_HEADER,
+    username: str = EMPTY_HEADER,
     count: str = EMPTY_HEADER,
     jobid: str = EMPTY_HEADER,
     runtime: str = EMPTY_HEADER,
     ports: str = EMPTY_HEADER,
+    body: HttpBody = EMPTY_BODY,
 ):
-    CONNECTOR.reinitialize(username, password, "orchestration")
-    result = CONNECTOR.create_deployment(
-        tenantname,
-        partname,
-        imagename,
-        flavorname,
-        keyname,
-        count,
-        jobid,
-        runtime,
-        ports,
-    )
-    LOG.info(f"Create Azure partition {partname} for tenant {tenantname}, job id: {jobid}")
-    LOG.debug(f"Partition {partname} creation options:")
-    LOG.debug(f" * username: {username}")
-    LOG.debug(f" * image: {imagename}")
+    LOG.info(f"Create Azure partition for job {jobid}")
+    LOG.debug(f"Partition creation options:")
+    LOG.debug(f" * subscription: {subscriptionid}")
+    LOG.debug(f" * tenant: {tenantid}")
+    LOG.debug(f" * app: {appid}")
+    LOG.debug(f" * vmimage: {vmimage}")
+    LOG.debug(f" * containerimage: {containerimage}")
     LOG.debug(f" * flavor: {flavorname}")
-    LOG.debug(f" * keyname: {keyname}")
+    LOG.debug(f" * username: {username}")
     LOG.debug(f" * extra nodes: {count}")
     LOG.debug(f" * runtime: {runtime}")
     LOG.debug(f" * ports: {ports}")
-    return {"partition": result}
+    CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
+    try:
+        if result := CONNECTOR.create_deployment(
+            jobid,
+            vmimage,
+            containerimage,
+            flavorname,
+            username,
+            count,
+            runtime,
+            ports,
+        ):
+            return {"partition": result}
+    except Exception as e:
+        return {"error": traceback.format_exception(e)}
+    return {"error": "Cannot create Azure deployment"}
 
 
 @ROUTER.get("/azure/partitions")
@@ -73,12 +79,12 @@ async def list_partitions(
 
 @ROUTER.get("/azure/partitions//subscriptions/{subscriptionid}/resourceGroups/{partitionname}")
 async def get_partition_info(
-        subscriptionid: str,
+    subscriptionid: str,
     partitionname: str,
     tenantid: str = EMPTY_HEADER,
     appid: str = EMPTY_HEADER,
     body: HttpBody = EMPTY_BODY,
-    ):
+):
     try:
         CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
         if result := CONNECTOR.get_resource_group(partitionname):

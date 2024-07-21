@@ -15,7 +15,7 @@ from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
 TEMLPATE_FILE = "app/routers/azure/templates/partition.json"
-CLOUD_INIT_SCRIPT_FILE = "app/routers/openstack/templates/cloud-init.sh"
+CLOUD_INIT_SCRIPT_FILE = "app/routers/azure/templates/cloud-init.sh"
 
 
 class AzureConnector(BaseConnector):
@@ -55,7 +55,8 @@ class AzureConnector(BaseConnector):
         flavor_name: str,
         os_version: str,
         username: str,
-        user_pub_cert_path: str,
+        user_pub_key: str,
+        cloud_init_script: str,
     ) -> dict[str, dict[str, typing.Any]]:
         with open(TEMLPATE_FILE) as template_file:
             template = json.load(template_file)
@@ -64,7 +65,8 @@ class AzureConnector(BaseConnector):
             flavor_name,
             os_version,
             username,
-            user_pub_cert_path,
+            user_pub_key,
+            cloud_init_script,
         )
         LOG.debug(f"Template parameters for job {job_id}: {tempalte_parameters}")
         return {
@@ -81,24 +83,21 @@ class AzureConnector(BaseConnector):
         flavor_name: str,
         os_version: str,
         username: str,
-        user_pub_cert_path: str,
+        user_pub_key: str,
+        cloud_init_script: str,
     ) -> dict[str, str]:
         return {
             "resourcePrefix": {"value": self._get_resource_prefix(job_id)},
             "adminUsername": {"value": username},
-            "adminPasswordOrKey": {"value": self._get_vm_user_public_certificate(user_pub_cert_path)},
+            "adminPasswordOrKey": {"value": user_pub_key},
             "osVersion": {"value": os_version},
             "vmSize": {"value": flavor_name},
+            "cloudInitScript": {"value": cloud_init_script},
         }
 
     def _read_template(self, template_path) -> str:
         with open(template_path) as template_file:
             return json.load(template_file)
-
-    def _get_vm_user_public_certificate(self, user_pub_cert_path: str) -> str:
-        with open(user_pub_cert_path, "rb") as file:
-            pub_cert_content = file.read()
-        return pub_cert_content.decode("utf-8")
 
     def _get_pem_data(self, cert_file_path: str, key_file_path: str) -> str:
         with open(cert_path, "rb") as file:
@@ -188,7 +187,7 @@ class AzureConnector(BaseConnector):
             max_date_image.extra: dict[str, str] = {"sku": sku, "publisher": publisher, "offer": offer}
         return max_date_image
 
-    def _get_cloud_init_script(self, job_id: str, runtime: str) -> str:
+    def _get_cloud_init_script(self, job_id: str, container_image: str, runtime: str) -> str:
         runtime_params = self._get_runtime_params(runtime)
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader, autoescape=True)
@@ -196,6 +195,8 @@ class AzureConnector(BaseConnector):
         script: str = template.render(
             job_id=job_id,
             swm_source=runtime_params.get("swm_source"),
+            ssh_pub_key=runtime_params.get("ssh_pub_key"),
+            container_image=contianer_image,
         )
         return script
 
@@ -227,7 +228,7 @@ class AzureConnector(BaseConnector):
             prefix = self._get_resource_prefix_no_job_id()
             for resource_group in resource_groups:
                 if not resource_group.name.startswith(prefix):
-                    return None
+                    continue
                 if info := self._get_resource_group_info(resource_group.id, resource_group.name):
                     group_resources.append(info)
         return group_resources
@@ -254,19 +255,17 @@ class AzureConnector(BaseConnector):
                 resource_group_info["resources"].append(resource)
         return resource_group_info
 
-
     def create_deployment(
         self,
         job_id: str,
-        location: str,
+        vm_image: str,
+        container_image: str,
         flavor_name: str,
-        os_version: str,
+        username: str,
         count: str,
         runtime: str,
         ports: str,
-        user_pub_cert_path: str,
     ) -> str:
-        # TODO use runtime, count and ports
         resource_prefix = self._get_resource_prefix(job_id)
         resource_group_name = self._get_resource_group_name(resource_prefix)
         resource_group_creation_result = self._resource_client.resource_groups.create_or_update(
@@ -274,13 +273,17 @@ class AzureConnector(BaseConnector):
         )
         LOG.info(f"Provisioned resource group with ID: {resource_group_creation_result.id}")
 
+        # TODO use count and ports
+        cloud_init_script: str = self._get_cloud_init_script(job_id, container_image, runtime)
+
         deployment_name = self._get_deployment_name(resource_prefix)
         deployment_properties = self._get_deployment_properties(
             job_id,
             flavor_name,
             os_version,
             username,
-            user_pub_cert_path,
+            user_pub_key,
+            cloud_init_script,
         )
         deployment_async_operation = resource_client.deployments.begin_create_or_update(
             resource_group_name,
