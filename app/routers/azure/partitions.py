@@ -1,5 +1,6 @@
 import http
 import logging
+import traceback
 import typing
 
 from fastapi import APIRouter, Body, Header, HTTPException
@@ -54,27 +55,35 @@ async def create_partition(
 
 
 @ROUTER.get("/azure/partitions")
-async def list_partitions(username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
-    CONNECTOR.reinitialize(username, password, "orchestration")
-    partitions: typing.List[PartInfo] = []
-    for stack in CONNECTOR.list_stacks():
-        if "id" not in stack or "stack_name" not in stack:
-            LOG.warn(f"Returned stack information is incomplete: {stack}")
-            continue
-        partitions.append(convert_to_partition(stack))
-    return {"partitions": partitions}
+async def list_partitions(
+    subscriptionid: str = EMPTY_HEADER,
+    tenantid: str = EMPTY_HEADER,
+    appid: str = EMPTY_HEADER,
+    body: HttpBody = EMPTY_BODY,
+):
+    CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
+    try:
+        partitions: typing.List[PartInfo] = []
+        for resource_group_info in CONNECTOR.list_resource_groups():
+            partitions.append(convert_to_partition(resource_group_info))
+        return {"partitions": partitions}
+    except Exception as e:
+        return {"error": traceback.format_exception(e)}
 
 
 @ROUTER.get("/azure/partitions/{id}")
 async def get_partition_info(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
-    CONNECTOR.reinitialize(username, password, "orchestration")
-    stack = CONNECTOR.get_stack(id)
-    if not stack:
-        raise HTTPException(
-            status_code=http.client.NOT_FOUND,
-            detail="Partition not found",
-        )
-    return convert_to_partition(stack)
+    try:
+        CONNECTOR.reinitialize(username, password, "orchestration")
+        stack = CONNECTOR.get_stack(id)
+        if not stack:
+            raise HTTPException(
+                status_code=http.client.NOT_FOUND,
+                detail="Partition not found",
+            )
+        return convert_to_partition(stack)
+    except Exception as e:
+        return {"error": traceback.format_exception(e)}
 
 
 @ROUTER.delete("/azure/partitions//subscriptions/{subscriptionid}/resourceGroups/{partitionname}")
@@ -90,4 +99,4 @@ async def delete_partition(
         result = CONNECTOR.delete_resource_group(partitionname)
         return {"result": result}
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": traceback.format_exception(e)}

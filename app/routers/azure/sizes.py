@@ -1,3 +1,5 @@
+import traceback
+
 from fastapi import APIRouter, Body, Header
 
 from ..models import HttpBody, ImageInfo
@@ -25,6 +27,6 @@ async def list_flavors(
             for item in sizes:
                 flavor_list.append(convert_to_flavor(item))
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": traceback.format_exception(e)}
 
     return {"flavors": flavor_list}

@@ -1,4 +1,5 @@
 import http
+import traceback
 
 from fastapi import APIRouter, Body, Header, HTTPException
 
@@ -28,9 +29,12 @@ async def get_image_info(
     appid: str = EMPTY_HEADER,
     body: HttpBody = EMPTY_BODY,
 ) -> ImageInfo:
-    CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
-    if image := CONNECTOR.find_image(location, publisher, offer, sku, version):
-        return convert_to_image(image)
+    try:
+        CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
+        if image := CONNECTOR.find_image(location, publisher, offer, sku, version):
+            return convert_to_image(image)
+    except Exception as e:
+        return {"error": traceback.format_exception(e)}
     raise HTTPException(
         status_code=http.client.NOT_FOUND,
         error=f"Image not found by id: {image_id}",
@@ -54,5 +58,5 @@ async def list_images(
         for image in CONNECTOR.list_images(location, publisher, offer, skus):
             images_info.append(convert_to_image(image))
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": traceback.format_exception(e)}
     return {"images": images_info}

@@ -114,7 +114,10 @@
     "$fxv#0": "#cloud-config\nruncmd: |+\n    #!/bin/bash -ex\n\n    echo \"Hello Sky Port\" > /tmp/hello.log\n    exit 0\n",
     "imageReference": {
       "Ubuntu-2204-swm": {
-        "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/swmImages/providers/Microsoft.Compute/images/ubuntu-22.04-swm"
+        "publisher": "Canonical",
+        "offer": "0001-com-ubuntu-server-jammy",
+        "sku": "22_04-lts",
+        "version": "22.04.202407160"
       }
     },
     "publicIPAddressName": "[format('{0}-PublicIP', parameters('resourcePrefix'))]",

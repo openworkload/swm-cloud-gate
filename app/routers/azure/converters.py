@@ -35,5 +35,12 @@ def convert_to_image(data: VirtualMachineImage) -> ImageInfo:
     return image
 
 
-def convert_to_partition(data: typing.Dict[str, typing.Any]) -> PartInfo:
-    return PartInfo(id=part["id"], name=data["stack_name"])
+def convert_to_partition(data: dict[str, typing.Any]) -> PartInfo:
+    part = PartInfo(id=data["id"], name=data["name"])
+    for resource in data.get("resources", []):
+        if resource.type == "Microsoft.Network/publicIPAddresses":
+            part.master_public_ip = resource.properties.get("ipAddress")
+        if resource.type == "Microsoft.Network/networkInterfaces":
+            if ip_conf := resource.properties.get("ipConfigurations"):
+                part.master_private_ip = ip_conf[0].get("properties", {}).get("privateIPAddress")
+    return part
