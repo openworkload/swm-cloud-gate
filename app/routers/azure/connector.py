@@ -107,8 +107,11 @@ class AzureConnector(BaseConnector):
             key_content = file.read()
         return key_content + cert_content
 
+    def _get_resource_prefix_no_job_id(self) -> str:
+        return "swm-"
+
     def _get_resource_prefix(self, job_id: str) -> str:
-        return "swm-" + job_id.split("-")[0]
+        return self._get_resource_prefix_no_job_id() + job_id.split("-")[0]
 
     def _get_resource_group_name(self, resource_prefix: str) -> str:
         return f"{resource_prefix}-resource-group"
@@ -205,14 +208,43 @@ class AzureConnector(BaseConnector):
         LOG.debug(f"Runtime parameters parsed: {runtime_params}")
         return runtime_params
 
-    def list_stacks(self) -> typing.List[typing.Dict[str, typing.Any]]:
-        if "stacks" in self._test_responses:
-            stacks = []
-            for it in self._test_responses["stacks"]:
-                stacks.append(it)
-            return stacks
+    def get_resource_group(self, resource_group_name: str) -> typing.Dict[str, typing.Any]:
         # TODO
-        return []
+        return {}
+
+    def list_resource_groups(self) -> list[dict[str, typing.Any]]:
+        if "resource_groups" in self._test_responses:
+            resource_groups = []
+            for it in self._test_responses["resource_groups"]:
+                resource_groups.append(it)
+            return resource_groups
+        group_resources: list[dict[str, list[typing.Any]]] = []
+        if resource_groups := self._resource_client.resource_groups.list():
+            prefix = self._get_resource_prefix_no_job_id()
+            for resource_group in resource_groups:
+                if not resource_group.name.startswith(prefix):
+                    continue
+                resource_group_info: dict[str, list[typing.Any]] = {
+                    "resources": [],
+                    "id": resource_group.id,
+                    "name": resource_group.name,
+                }
+                if resources := self._resource_client.resources.list_by_resource_group(
+                    resource_group.name, expand="properties,createdTime,changedTime"
+                ):
+                    for resource in resources:
+                        if resource.type in [
+                            "Microsoft.Network/publicIPAddresses",
+                            "Microsoft.Network/networkInterfaces",
+                        ]:
+                            if extended_resource := self._resource_client.resources.get_by_id(
+                                resource.id, api_version="2019-02-01"
+                            ):
+                                resource_group_info["resources"].append(extended_resource)
+                                continue
+                        resource_group_info["resources"].append(resource)
+                group_resources.append(resource_group_info)
+        return group_resources
 
     def create_deployment(
         self,
@@ -253,10 +285,6 @@ class AzureConnector(BaseConnector):
         except HttpResponseError as e:
             LOG.error(f"Exception when deploying resources for job {job_id}: {e}")
         return ""
-
-    def get_stack(self, stack_id: str) -> typing.Dict[str, typing.Any]:
-        # TODO
-        return {}
 
     def delete_resource_group(self, resource_group_name: str) -> str | None:
         if delete_async_operation := self._resource_client.resource_groups.begin_delete(resource_group_name):
