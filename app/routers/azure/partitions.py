@@ -71,19 +71,21 @@ async def list_partitions(
         return {"error": traceback.format_exception(e)}
 
 
-@ROUTER.get("/azure/partitions/{id}")
-async def get_partition_info(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
+@ROUTER.get("/azure/partitions//subscriptions/{subscriptionid}/resourceGroups/{partitionname}")
+async def get_partition_info(
+        subscriptionid: str,
+    partitionname: str,
+    tenantid: str = EMPTY_HEADER,
+    appid: str = EMPTY_HEADER,
+    body: HttpBody = EMPTY_BODY,
+    ):
     try:
-        CONNECTOR.reinitialize(username, password, "orchestration")
-        stack = CONNECTOR.get_stack(id)
-        if not stack:
-            raise HTTPException(
-                status_code=http.client.NOT_FOUND,
-                detail="Partition not found",
-            )
-        return convert_to_partition(stack)
+        CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
+        if result := CONNECTOR.get_resource_group(partitionname):
+            return convert_to_partition(result)
     except Exception as e:
         return {"error": traceback.format_exception(e)}
+    return {"error": "Partition not found"}
 
 
 @ROUTER.delete("/azure/partitions//subscriptions/{subscriptionid}/resourceGroups/{partitionname}")

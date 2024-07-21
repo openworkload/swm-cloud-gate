@@ -209,8 +209,12 @@ class AzureConnector(BaseConnector):
         return runtime_params
 
     def get_resource_group(self, resource_group_name: str) -> typing.Dict[str, typing.Any]:
-        # TODO
-        return {}
+        prefix = self._get_resource_prefix_no_job_id()
+        if not resource_group_name.startswith(prefix):
+            return None
+        if resource_group := self._resource_client.resource_groups.get(resource_group_name):
+            return self._get_resource_group_info(resource_group.id, resource_group.name)
+        return None
 
     def list_resource_groups(self) -> list[dict[str, typing.Any]]:
         if "resource_groups" in self._test_responses:
@@ -223,28 +227,33 @@ class AzureConnector(BaseConnector):
             prefix = self._get_resource_prefix_no_job_id()
             for resource_group in resource_groups:
                 if not resource_group.name.startswith(prefix):
-                    continue
-                resource_group_info: dict[str, list[typing.Any]] = {
-                    "resources": [],
-                    "id": resource_group.id,
-                    "name": resource_group.name,
-                }
-                if resources := self._resource_client.resources.list_by_resource_group(
-                    resource_group.name, expand="properties,createdTime,changedTime"
-                ):
-                    for resource in resources:
-                        if resource.type in [
-                            "Microsoft.Network/publicIPAddresses",
-                            "Microsoft.Network/networkInterfaces",
-                        ]:
-                            if extended_resource := self._resource_client.resources.get_by_id(
-                                resource.id, api_version="2019-02-01"
-                            ):
-                                resource_group_info["resources"].append(extended_resource)
-                                continue
-                        resource_group_info["resources"].append(resource)
-                group_resources.append(resource_group_info)
+                    return None
+                if info := self._get_resource_group_info(resource_group.id, resource_group.name):
+                    group_resources.append(info)
         return group_resources
+
+    def _get_resource_group_info(self, id: str, name: str) -> dict[str, list[typing.Any]]:
+        resource_group_info: dict[str, list[typing.Any]] = {
+            "resources": [],
+            "id": id,
+            "name": name,
+        }
+        if resources := self._resource_client.resources.list_by_resource_group(
+            name, expand="properties,createdTime,changedTime"
+        ):
+            for resource in resources:
+                if resource.type in [
+                    "Microsoft.Network/publicIPAddresses",
+                    "Microsoft.Network/networkInterfaces",
+                ]:  # We need extended properties for those resources
+                    if extended_resource := self._resource_client.resources.get_by_id(
+                        resource.id, api_version="2019-02-01"
+                    ):
+                        resource_group_info["resources"].append(extended_resource)
+                        continue
+                resource_group_info["resources"].append(resource)
+        return resource_group_info
+
 
     def create_deployment(
         self,
