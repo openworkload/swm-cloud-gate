@@ -20,7 +20,7 @@ async def create_partition(
     password: str = EMPTY_HEADER,
     tenantname: str = EMPTY_HEADER,
     partname: str = EMPTY_HEADER,
-    imagename: str = EMPTY_HEADER,
+    vmimage: str = EMPTY_HEADER,
     flavorname: str = EMPTY_HEADER,
     keyname: str = EMPTY_HEADER,
     count: str = EMPTY_HEADER,
@@ -33,7 +33,7 @@ async def create_partition(
     result = CONNECTOR.create_stack(
         tenantname,
         partname,
-        imagename,
+        vmimage,
         flavorname,
         keyname,
         count,
@@ -45,7 +45,7 @@ async def create_partition(
     LOG.info(f"Create OpenStack partition {partname} for tenant {tenantname}, job id: {jobid}")
     LOG.debug(f"Partition {partname} creation options:")
     LOG.debug(f" * username: {username}")
-    LOG.debug(f" * image: {imagename}")
+    LOG.debug(f" * image: {vmimage}")
     LOG.debug(f" * flavor: {flavorname}")
     LOG.debug(f" * keyname: {keyname}")
     LOG.debug(f" * extra nodes: {count}")

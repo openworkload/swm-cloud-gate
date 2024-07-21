@@ -10,6 +10,12 @@
     "description": "Creates a Sky Port partition resources"
   },
   "parameters": {
+    "cloudInitScript": {
+      "type": "string",
+      "metadata": {
+        "description": "Cloud init script content."
+      }
+    },
     "resourcePrefix": {
       "type": "string",
       "metadata": {
@@ -111,7 +117,7 @@
     }
   },
   "variables": {
-    "$fxv#0": "#cloud-config\nruncmd: |+\n    #!/bin/bash -ex\n\n    echo \"Hello Sky Port\" > /tmp/hello.log\n    exit 0\n",
+    "$fxv#0": "parameters('cloudInitScript')",
     "imageReference": {
       "Ubuntu-2204-swm": {
         "publisher": "Canonical",
