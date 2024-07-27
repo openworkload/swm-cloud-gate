@@ -11,6 +11,13 @@ class BaseConnector:
         self._provider_name = provider_name
         self._test_responses = self._get_test_responses()
 
+    def find_image(self, image_id: str) -> typing.Union:
+        images = self.list_images()
+        found = [it for it in images if it.id == image_id]
+        if found:
+            return found[0]
+        return None
+
     def _get_test_responses(self) -> typing.Dict[str, str]:
         file_path = os.getenv("SWM_TEST_CONFIG", None)
         if file_path:
@@ -25,9 +32,11 @@ class BaseConnector:
                     LOG.error(e)
         return {}
 
-    def find_image(self, image_id: str) -> typing.Union:
-        images = self.list_images()
-        found = [it for it in images if it.id == image_id]
-        if found:
-            return found[0]
-        return None
+    def _get_runtime_params(self, runtime: str) -> dict[str, str]:
+        runtime_params: dict[str, str] = {}
+        LOG.debug(f"Runtime parameters string: {runtime}")
+        for it in runtime.split(","):
+            [key, value] = it.split("=", 1)
+            runtime_params[key.strip()] = value.strip()
+        LOG.debug(f"Runtime parameters parsed: {runtime_params}")
+        return runtime_params

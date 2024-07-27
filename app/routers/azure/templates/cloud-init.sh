@@ -1,5 +1,7 @@
 #!/bin/bash -ex
 
+HOST_NAME=$(hostname)
+
 function download_swm_worker() {
     echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source }}"
 
@@ -15,7 +17,7 @@ function download_swm_worker() {
 
         while true; do
             if [[ -f "$file_path" ]]; then
-                echo "$(date): file '$file_path' found"
+                echo "$(date): file $file_path found"
                 sleep 10
                 tar -xzf "$file_path" -C "$target_directory"
                 break
@@ -58,14 +60,9 @@ function download_swm_worker() {
 }
 
 function setup_network() {
-    GATEWAY_IP=$(ip -4 addr show $(ip -4 route list 0/0 | awk -F' ' '{ print $5 }') | grep -oP "(?<=inet\\s)\\d+(\\.\\d+){3}")
+    GATEWAY_IP=$(ip -4 addr show $(ip -4 route list 0/0 | awk -F" " "{ print \$5 }") | grep -oP "(?<=inet\\s)\\d+(\\.\\d+){3}")
     IS_MAIN=true
     echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$GATEWAY_IP, master: ${IS_MAIN})"
-
-    hostname $HOST_NAME.openworkload.org
-    echo $HOST_NAME.openworkload.org > /etc/hostname
-    echo $(date) ": hostname=$(hostname)"
-
     echo $GATEWAY_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
     echo $(date) ": /etc/hosts:"
     cat /etc/hosts
@@ -101,20 +98,11 @@ function setup_mounts() {
     echo
 }
 
-function install_packages() {
-    echo $(date) ": install packages"
-
-    apt-get --yes update
-    apt-get --yes install docker docker.io
-    apt-get --yes install cgroupfs-mount
-    apt-get --yes install net-tools  # wm_docker.erl uses route utility
-}
-
 function setup_docker() {
     echo $(date) ": setup docker"
 
     # swm connects to docker via tcp => enable this port listening in the docker daemon:
-    sed -i '/^ExecStart/s/$/ -H tcp:\/\/127.0.0.1:6000 --insecure-registry 172.28.128.2:6006/' /lib/systemd/system/docker.service
+    sed -i "/^ExecStart/s/$/ -H tcp:\/\/127.0.0.1:6000 --insecure-registry 172.28.128.2:6006/" /lib/systemd/system/docker.service
     systemctl daemon-reload
 
     # Fix docker connections failures
@@ -129,7 +117,12 @@ function setup_docker() {
 }
 
 function pull_container_image() {
-    echo $(date) ": pull job container image from container registry: '{{ container_image }}'"
+    if [ "{{ container_registry_password }}" != "" ]; then
+        echo $(date) ": login to the registry: {{ container_registry }}"
+        docker login {{ container_registry }} --username {{ container_registry_username }} --password {{ container_registry_password }}
+    fi
+
+    echo $(date) ": pull job container image from container registry: {{ container_image }}"
     docker pull {{ container_image }}
 
     echo $(date) ": all local docker images after the pulling:"
@@ -138,7 +131,6 @@ function pull_container_image() {
 
 setup_network
 setup_mounts
-install_packages
 setup_docker
 pull_container_image
 download_swm_worker

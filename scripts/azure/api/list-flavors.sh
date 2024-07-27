@@ -8,8 +8,6 @@ KEY=~/.swm/key.pem
 CA=/opt/swm/spool/secure/cluster/ca-chain-cert.pem
 PEM_DATA=$(make_pem_data $CERT $KEY)
 
-LOCATION="eastus"
-
 PORT=8444
 HOST=$(hostname -s)
 
@@ -18,7 +16,7 @@ HEADER1="Accept: application/json"
 HEADER2="subscriptionid: ${SUBSCRIPTION_ID}"
 HEADER3="tenantid: ${TENANT_ID}"
 HEADER4="appid: ${APP_ID}"
-HEADER5="location: ${LOCATION}"
+HEADER5="location: eastus"
 URL="https://${HOST}:${PORT}/azure/flavors"
 BODY='{"pem_data": '${PEM_DATA}'}'
 

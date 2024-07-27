@@ -10,12 +10,6 @@
     "description": "Creates a Sky Port partition resources"
   },
   "parameters": {
-    "cloudInitScript": {
-      "type": "string",
-      "metadata": {
-        "description": "Cloud init script content."
-      }
-    },
     "resourcePrefix": {
       "type": "string",
       "metadata": {
@@ -61,9 +55,9 @@
     },
     "osVersion": {
       "type": "string",
-      "defaultValue": "Ubuntu-2204-swm",
+      "defaultValue": "ubuntu-22.04",
       "allowedValues": [
-        "Ubuntu-2204-swm"
+        "ubuntu-22.04"
       ],
       "metadata": {
         "description": "The Linux version for the VM."
@@ -114,12 +108,15 @@
       "metadata": {
         "description": "Security Type of the VM."
       }
+    },
+    "cloudInitScript": {
+      "type": "string",
+      "defaultValue": "#cloud-config\npackages:\n - docker\n - docker.io\n - cgroupfs-mount\n - net-tools"
     }
   },
   "variables": {
-    "$fxv#0": "parameters('cloudInitScript')",
     "imageReference": {
-      "Ubuntu-2204-swm": {
+      "ubuntu-22.04": {
         "publisher": "Canonical",
         "offer": "0001-com-ubuntu-server-jammy",
         "sku": "22_04-lts",
@@ -154,7 +151,7 @@
     "extensionVersion": "1.0",
     "maaTenantName": "GuestAttestation",
     "maaEndpoint": "[substring('emptystring', 0, 0)]",
-    "cloudInit": "[base64(variables('$fxv#0'))]"
+    "customData": "[base64(parameters('cloudInitScript'))]"
   },
   "resources": [
     {
@@ -283,7 +280,7 @@
           "adminUsername": "[parameters('adminUsername')]",
           "adminPassword": "[parameters('adminPasswordOrKey')]",
           "linuxConfiguration": "[if(equals(parameters('authenticationType'), 'password'), null(), variables('linuxConfiguration'))]",
-          "customData": "[variables('cloudInit')]"
+          "customData": "[variables('customData')]"
         },
         "securityProfile": "[if(equals(parameters('securityType'), 'TrustedLaunch'), variables('securityProfileJson'), null())]"
       },
