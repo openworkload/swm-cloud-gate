@@ -1,0 +1,16 @@
+#cloud-config
+
+packages:
+  - docker
+  - docker.io
+  - cgroupfs-mount
+  - net-tools
+
+write_files:
+  - path: /tmp/swm-init.sh
+    permissions: '0755'
+    content: |+
+{{cloud_init_script}}
+
+runcmd:
+  - bash /tmp/swm-init.sh

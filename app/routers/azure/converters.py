@@ -3,6 +3,7 @@ import typing
 import uuid
 
 from azure.mgmt.compute.models import VirtualMachineImage, VirtualMachineSize
+from azure.mgmt.resource.resources.models import DeploymentExtended
 
 from ..models import Flavor, ImageInfo, PartInfo
 
@@ -36,6 +37,8 @@ def convert_to_image(data: VirtualMachineImage) -> ImageInfo:
 
 
 def convert_to_partition(data: dict[str, typing.Any]) -> PartInfo:
+    if isinstance(data, DeploymentExtended):
+        data = data.as_dict()
     part = PartInfo(id=data["id"], name=data["name"])
     for resource in data.get("resources", []):
         if resource.type == "Microsoft.Network/publicIPAddresses":

@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import typing
@@ -16,6 +17,7 @@ from ..baseconnector import BaseConnector
 LOG = logging.getLogger("swm")
 TEMLPATE_FILE = "app/routers/azure/templates/partition.json"
 CLOUD_INIT_SCRIPT_FILE = "app/routers/azure/templates/cloud-init.sh"
+CLOUD_INIT_YAML = "app/routers/azure/templates/cloud-init.yaml"
 
 
 class AzureConnector(BaseConnector):
@@ -57,6 +59,7 @@ class AzureConnector(BaseConnector):
         username: str,
         user_pub_key: str,
         cloud_init_script: str,
+        ports: str,
     ) -> dict[str, dict[str, typing.Any]]:
         with open(TEMLPATE_FILE) as template_file:
             template = json.load(template_file)
@@ -68,7 +71,9 @@ class AzureConnector(BaseConnector):
             user_pub_key,
             cloud_init_script,
         )
-        LOG.debug(f"Template parameters for job {job_id}: {tempalte_parameters}")
+        LOG.debug(f"Template parameters for job {job_id}: {template_parameters}")
+        self._append_security_rules(ports, template)
+        # self._append_cloud_init_script(cloud_init_script, template)
         return {
             "properties": {
                 "template": template,
@@ -76,6 +81,36 @@ class AzureConnector(BaseConnector):
                 "mode": DeploymentMode.incremental,
             }
         }
+
+    def _append_security_rules(self, ports: str, template: dict[str, typing.Any]) -> None:
+        for resource in template["resources"]:
+            if resource["type"] == "Microsoft.Network/networkSecurityGroups":
+                for counter, port in enumerate(ports.split(",")):
+                    rule = {
+                        "name": f"swm-port-{port}",
+                        "properties": {
+                            "priority": 1001 + counter,
+                            "protocol": "Tcp",
+                            "access": "Allow",
+                            "direction": "Inbound",
+                            "sourceAddressPrefix": "*",
+                            "sourcePortRange": "*",
+                            "destinationAddressPrefix": "*",
+                            "destinationPortRange": port,
+                        },
+                    }
+                    LOG.debug(f"Add security group rule: {rule}")
+                    resource["properties"]["securityRules"].append(rule)
+
+    def _append_cloud_init_script(self, cloud_init_script: str, template: str) -> None:
+        cloud_init_yaml = f"#cloud-config\nruncmd: |+\n{self._indent_lines(cloud_init_script, 4)}"
+        encoded = base64.b64encode(cloud_init_yaml.encode("utf-8"))
+        template["variables"]["cloudInit"] = f"[base64('{encoded}')]"
+
+    def _indent_lines(self, text: str, indentation: int) -> str:
+        lines = text.split("\n")
+        indented_lines = [" " * indentation + line for line in lines]
+        return "\n".join(indented_lines)
 
     def _get_template_parameters(
         self,
@@ -86,13 +121,23 @@ class AzureConnector(BaseConnector):
         user_pub_key: str,
         cloud_init_script: str,
     ) -> dict[str, str]:
+        # packages = ["docker", "docker.io", "cgroupfs-mount", "net-tools"]
+        # runcmd = "    cat > /var/lib/cloud/scripts/runcmd.sh <<EOF\n" + self._indent_lines(cloud_init_script, 4) + "\n    EOF"
+        # cloud_init = "#cloud-config\npackages:\n - " + "\n - ".join(packages) + "\nruncmd: |+\n" + runcmd
+
+        template_loader = jinja2.FileSystemLoader(searchpath="./")
+        template_env = jinja2.Environment(loader=template_loader, autoescape=False)
+        template = template_env.get_template(CLOUD_INIT_YAML)
+        cloud_init_yaml: str = template.render(
+            cloud_init_script=self._indent_lines(cloud_init_script, 6),
+        )
         return {
             "resourcePrefix": {"value": self._get_resource_prefix(job_id)},
             "adminUsername": {"value": username},
             "adminPasswordOrKey": {"value": user_pub_key},
             "osVersion": {"value": os_version},
             "vmSize": {"value": flavor_name},
-            "cloudInitScript": {"value": cloud_init_script},
+            "cloudInitScript": {"value": cloud_init_yaml},
         }
 
     def _read_template(self, template_path) -> str:
@@ -187,8 +232,15 @@ class AzureConnector(BaseConnector):
             max_date_image.extra: dict[str, str] = {"sku": sku, "publisher": publisher, "offer": offer}
         return max_date_image
 
-    def _get_cloud_init_script(self, job_id: str, container_image: str, runtime: str) -> str:
-        runtime_params = self._get_runtime_params(runtime)
+    def _get_cloud_init_script(
+        self,
+        job_id: str,
+        container_image: str,
+        container_registry: str,
+        container_registry_username: str,
+        container_registry_password: str,
+        runtime_params: str,
+    ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader, autoescape=True)
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
@@ -196,18 +248,12 @@ class AzureConnector(BaseConnector):
             job_id=job_id,
             swm_source=runtime_params.get("swm_source"),
             ssh_pub_key=runtime_params.get("ssh_pub_key"),
-            container_image=contianer_image,
+            container_image=container_image,
+            container_registry=container_registry,
+            container_registry_username=container_registry_username,
+            container_registry_password=container_registry_password,
         )
         return script
-
-    def _get_runtime_params(self, runtime: str) -> dict[str, str]:
-        runtime_params: dict[str, str] = {}
-        LOG.debug(f"Runtime parameters string: {runtime}")
-        for it in runtime.split(","):
-            [key, value] = it.split("=")
-            runtime_params[key] = value
-        LOG.debug(f"Runtime parameters parsed: {runtime_params}")
-        return runtime_params
 
     def get_resource_group(self, resource_group_name: str) -> typing.Dict[str, typing.Any]:
         prefix = self._get_resource_prefix_no_job_id()
@@ -258,14 +304,19 @@ class AzureConnector(BaseConnector):
     def create_deployment(
         self,
         job_id: str,
-        vm_image: str,
+        os_version: str,
         container_image: str,
+        container_registry_username: str,
+        container_registry_password: str,
         flavor_name: str,
         username: str,
         count: str,
         runtime: str,
+        location: str,
         ports: str,
     ) -> str:
+        # TODO use count and ports
+
         resource_prefix = self._get_resource_prefix(job_id)
         resource_group_name = self._get_resource_group_name(resource_prefix)
         resource_group_creation_result = self._resource_client.resource_groups.create_or_update(
@@ -273,8 +324,16 @@ class AzureConnector(BaseConnector):
         )
         LOG.info(f"Provisioned resource group with ID: {resource_group_creation_result.id}")
 
-        # TODO use count and ports
-        cloud_init_script: str = self._get_cloud_init_script(job_id, container_image, runtime)
+        runtime_params = self._get_runtime_params(runtime)
+        container_registry = container_image.split("/")[0]
+        cloud_init_script: str = self._get_cloud_init_script(
+            job_id,
+            container_image,
+            container_registry,
+            container_registry_username,
+            container_registry_password,
+            runtime_params,
+        )
 
         deployment_name = self._get_deployment_name(resource_prefix)
         deployment_properties = self._get_deployment_properties(
@@ -282,21 +341,18 @@ class AzureConnector(BaseConnector):
             flavor_name,
             os_version,
             username,
-            user_pub_key,
+            runtime_params.get("ssh_pub_key"),
             cloud_init_script,
+            ports,
         )
-        deployment_async_operation = resource_client.deployments.begin_create_or_update(
+        deployment_async_operation = self._resource_client.deployments.begin_create_or_update(
             resource_group_name,
             deployment_name,
             deployment_properties,
         )
-        LOG.info(f"Deploying resource group {resource_group_name}, deployment: {deployment_name}")
 
-        try:
-            return deployment_async_operation.result()
-        except HttpResponseError as e:
-            LOG.error(f"Exception when deploying resources for job {job_id}: {e}")
-        return ""
+        LOG.info(f"Deploying resource group {resource_group_name}, deployment: {deployment_name}")
+        return deployment_async_operation.result()
 
     def delete_resource_group(self, resource_group_name: str) -> str | None:
         if delete_async_operation := self._resource_client.resource_groups.begin_delete(resource_group_name):

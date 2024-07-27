@@ -130,15 +130,6 @@ class OpenStackConnector(BaseConnector):
         )
         return script
 
-    def _get_runtime_params(self, runtime: str) -> dict[str, str]:
-        runtime_params: dict[str, str] = {}
-        LOG.debug(f"Runtime parameters string: {runtime}")
-        for it in runtime.split(","):
-            [key, value] = it.split("=", 1)
-            runtime_params[key] = value
-        LOG.debug(f"Runtime parameters parsed: {runtime_params}")
-        return runtime_params
-
     def _request(
         self,
         action: str,

@@ -20,13 +20,16 @@ async def create_partition(
     subscriptionid: str = EMPTY_HEADER,
     tenantid: str = EMPTY_HEADER,
     appid: str = EMPTY_HEADER,
-    vmimage: str = EMPTY_HEADER,
+    osversion: str = EMPTY_HEADER,
     containerimage: str = EMPTY_HEADER,
+    containerregistryuser: str = EMPTY_HEADER,
+    containerregistrypass: str = EMPTY_HEADER,
     flavorname: str = EMPTY_HEADER,
     username: str = EMPTY_HEADER,
     count: str = EMPTY_HEADER,
     jobid: str = EMPTY_HEADER,
     runtime: str = EMPTY_HEADER,
+    location: str = EMPTY_HEADER,
     ports: str = EMPTY_HEADER,
     body: HttpBody = EMPTY_BODY,
 ):
@@ -35,26 +38,30 @@ async def create_partition(
     LOG.debug(f" * subscription: {subscriptionid}")
     LOG.debug(f" * tenant: {tenantid}")
     LOG.debug(f" * app: {appid}")
-    LOG.debug(f" * vmimage: {vmimage}")
+    LOG.debug(f" * osversion: {osversion}")
     LOG.debug(f" * containerimage: {containerimage}")
     LOG.debug(f" * flavor: {flavorname}")
     LOG.debug(f" * username: {username}")
     LOG.debug(f" * extra nodes: {count}")
     LOG.debug(f" * runtime: {runtime}")
+    LOG.debug(f" * location: {location}")
     LOG.debug(f" * ports: {ports}")
     CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
     try:
         if result := CONNECTOR.create_deployment(
             jobid,
-            vmimage,
+            osversion,
             containerimage,
+            containerregistryuser,
+            containerregistrypass,
             flavorname,
             username,
             count,
             runtime,
+            location,
             ports,
         ):
-            return {"partition": result}
+            return {"partition": convert_to_partition(result)}
     except Exception as e:
         return {"error": traceback.format_exception(e)}
     return {"error": "Cannot create Azure deployment"}
