@@ -4,8 +4,6 @@ import logging
 import typing
 
 import jinja2
-import yaml
-from azure.core.exceptions import HttpResponseError
 from azure.identity import CertificateCredential
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.models import VirtualMachineImage, VirtualMachineSize
@@ -121,12 +119,8 @@ class AzureConnector(BaseConnector):
         user_pub_key: str,
         cloud_init_script: str,
     ) -> dict[str, str]:
-        # packages = ["docker", "docker.io", "cgroupfs-mount", "net-tools"]
-        # runcmd = "    cat > /var/lib/cloud/scripts/runcmd.sh <<EOF\n" + self._indent_lines(cloud_init_script, 4) + "\n    EOF"
-        # cloud_init = "#cloud-config\npackages:\n - " + "\n - ".join(packages) + "\nruncmd: |+\n" + runcmd
-
         template_loader = jinja2.FileSystemLoader(searchpath="./")
-        template_env = jinja2.Environment(loader=template_loader, autoescape=False)
+        template_env = jinja2.Environment(loader=template_loader, autoescape=False)  # nosec B701
         template = template_env.get_template(CLOUD_INIT_YAML)
         cloud_init_yaml: str = template.render(
             cloud_init_script=self._indent_lines(cloud_init_script, 6),
@@ -145,7 +139,7 @@ class AzureConnector(BaseConnector):
             return json.load(template_file)
 
     def _get_pem_data(self, cert_file_path: str, key_file_path: str) -> str:
-        with open(cert_path, "rb") as file:
+        with open(cert_file_path, "rb") as file:
             cert_content = file.read()
         with open(key_file_path, "rb") as file:
             key_content = file.read()
@@ -355,7 +349,7 @@ class AzureConnector(BaseConnector):
         return deployment_async_operation.result()
 
     def delete_resource_group(self, resource_group_name: str) -> str | None:
-        if delete_async_operation := self._resource_client.resource_groups.begin_delete(resource_group_name):
+        if self._resource_client.resource_groups.begin_delete(resource_group_name):
             return "Deletion started"
         return None
 
