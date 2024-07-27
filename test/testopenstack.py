@@ -123,8 +123,8 @@ class TestOpenstackGate(asynctest.TestCase):
             data,
             {
                 "images": [
-                    {"created": None, "id": "i1", "name": "image1", "status": "creating", "updated": None},
-                    {"created": None, "id": "i2", "name": "cirros", "status": "created", "updated": None},
+                    {"id": "i1", "name": "image1", "extra": {"status": "creating"}},
+                    {"id": "i2", "name": "cirros", "extra": {"status": "created"}},
                 ]
             },
         )
@@ -185,11 +185,9 @@ class TestOpenstackGate(asynctest.TestCase):
         self.assertEqual(
             data,
             {
-                "created": None,
                 "id": "i1",
                 "name": "image1",
-                "status": "creating",
-                "updated": None,
+                "extra": {"status": "creating"},
             },
         )
 

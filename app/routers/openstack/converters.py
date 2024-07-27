@@ -29,11 +29,4 @@ def convert_to_flavor(data: NodeSize) -> Flavor:
 
 
 def convert_to_image(image: NodeImage) -> ImageInfo:
-    image_info = ImageInfo(id=image.id, name=image.name)
-    if "created" in image.extra:
-        image_info.created = image.extra["created"]
-    if "updated" in image.extra:
-        image_info.updated = image.extra["updated"]
-    if "status" in image.extra:
-        image_info.status = image.extra["status"]
-    return image_info
+    return ImageInfo(id=image.id, name=image.name, extra=image.extra)

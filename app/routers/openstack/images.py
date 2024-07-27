@@ -19,7 +19,7 @@ async def get_image_info(id: str, username: str = EMPTY_HEADER, password: str = 
         return convert_to_image(image)
     raise HTTPException(
         status_code=http.client.NOT_FOUND,
-        error="Image not found",
+        detail="Image not found",
     )
 
 
