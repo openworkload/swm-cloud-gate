@@ -70,13 +70,12 @@ async def list_partitions(username: str = EMPTY_HEADER, password: str = EMPTY_HE
 @ROUTER.get("/openstack/partitions/{id}")
 async def get_partition_info(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
     CONNECTOR.reinitialize(username, password, "orchestration")
-    stack = CONNECTOR.get_stack(id)
-    if not stack:
-        raise HTTPException(
-            status_code=http.client.NOT_FOUND,
-            detail="Partition not found",
-        )
-    return convert_to_partition(stack)
+    if stack := CONNECTOR.get_stack(id):
+        return convert_to_partition(stack)
+    raise HTTPException(
+        status_code=http.client.NOT_FOUND,
+        detail="Partition not found",
+    )
 
 
 @ROUTER.delete("/openstack/partitions/{id}")
