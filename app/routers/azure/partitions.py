@@ -2,7 +2,7 @@ import logging
 import traceback
 import typing
 
-from fastapi import APIRouter, Body, Header, HTTPException
+from fastapi import APIRouter, Body, Header
 
 from ..models import HttpBody, PartInfo
 from .connector import AzureConnector
@@ -34,7 +34,7 @@ async def create_partition(
     body: HttpBody = EMPTY_BODY,
 ):
     LOG.info(f"Create Azure partition for job {jobid}")
-    LOG.debug(f"Partition creation options:")
+    LOG.debug("Partition creation options:")
     LOG.debug(f" * subscription: {subscriptionid}")
     LOG.debug(f" * tenant: {tenantid}")
     LOG.debug(f" * app: {appid}")
