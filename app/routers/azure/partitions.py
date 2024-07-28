@@ -8,10 +8,10 @@ from ..models import HttpBody, PartInfo
 from .connector import AzureConnector
 from .converters import convert_to_partition
 
-CONNECTOR = AzureConnector()
-EMPTY_HEADER = Header(None)
 LOG = logging.getLogger("swm")
+CONNECTOR = AzureConnector()
 ROUTER = APIRouter()
+EMPTY_HEADER = Header(None)
 EMPTY_BODY = Body(None)
 
 

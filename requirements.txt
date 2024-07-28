@@ -159,6 +159,8 @@ pyjwt[crypto]==2.8.0
     # via msal
 pyproject-hooks==1.0.0
     # via build
+python-dotenv==1.0.1
+    # via -r requirements.in
 pyyaml==6.0.1
     # via
     #   -r requirements.in
