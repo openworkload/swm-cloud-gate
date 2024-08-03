@@ -1,12 +1,16 @@
 import http
+import logging
 import traceback
 
 from fastapi import APIRouter, Body, Header, HTTPException
+
+from app import cache
 
 from ..models import HttpBody, ImageInfo
 from .connector import AzureConnector
 from .converters import convert_to_image
 
+LOG = logging.getLogger("swm")
 CONNECTOR = AzureConnector()
 EMPTY_HEADER = Header(None)
 EMPTY_BODY = Body(None)
@@ -49,11 +53,20 @@ async def list_images(
     skus: str = EMPTY_HEADER,
     body: HttpBody = EMPTY_BODY,
 ) -> dict[str, str | list[ImageInfo]]:
+    cache_key = [location, publisher, offer, skus] if skus else [location, publisher, offer]
+    if data := cache.data_cache("vmimages").fetch_and_update(cache_key):
+        LOG.debug(f"VM images are taken from cache (amount={len(data)})")
+        return {"images": data}
     CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
-    images_info: list[ImageInfo] = []
+    image_list: list[ImageInfo] = []
     try:
         for image in CONNECTOR.list_images(location, publisher, offer, skus):
-            images_info.append(convert_to_image(image))
+            image_list.append(convert_to_image(image))
     except Exception as e:
         return {"error": traceback.format_exception(e)}
-    return {"images": images_info}
+
+    changed, deleted = cache.data_cache("vmimages").update(cache_key, image_list)
+    if changed or deleted:
+        LOG.debug(f"VM image cache updated (changed={changed}, deleted={deleted})")
+
+    return {"images": image_list}

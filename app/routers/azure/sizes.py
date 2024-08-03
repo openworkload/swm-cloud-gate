@@ -24,7 +24,7 @@ async def list_flavors(
     location: str = EMPTY_HEADER,
     body: HttpBody = EMPTY_BODY,
 ) -> dict[str, str | list[ImageInfo]]:
-    if data := cache.get("flavors").fetch_and_update(["location"]):
+    if data := cache.data_cache("flavors").fetch_and_update([location]):
         LOG.debug(f"Flavors are taken from cache (amount={len(data)})")
         return {"flavors": data}
     LOG.debug("Flavors not found in the cache => retrieve from Azure")
@@ -37,7 +37,7 @@ async def list_flavors(
     except Exception as e:
         return {"error": traceback.format_exception(e)}
 
-    changed, deleted = cache.get("flavors").update(["location"], flavor_list)
+    changed, deleted = cache.data_cache("flavors").update([location], flavor_list)
     if changed or deleted:
         LOG.debug(f"Flavors cache updated (changed={changed}, deleted={deleted})")
     return {"flavors": flavor_list}

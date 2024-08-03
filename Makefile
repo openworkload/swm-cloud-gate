@@ -1,7 +1,7 @@
 PYTHON=python3
 RUNTEST=$(PYTHON) -m unittest -v -b
 VENV_BIN=.venv/bin
-ALLMODULES=$(patsubst %.py, %.py, $(wildcard test*.py))
+ALLMODULES=$(patsubst %.py, %.py, $(wildcard test_*.py))
 
 .PHONY: prepare-venv
 .ONESHELL:
@@ -31,9 +31,9 @@ test:
 	. $(VENV_BIN)/activate
 	$(RUNTEST) $(ALLMODULES)
 
-% : test/test%.py
+% : test/test_%.py
 	. $(VENV_BIN)/activate
-	$(RUNTEST) test/test$@
+	$(RUNTEST) test/test_$@.py
 
 .PHONY: requirements
 requirements: requirements.txt
