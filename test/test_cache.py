@@ -1,11 +1,10 @@
-from pathlib import Path
-from tempfile import TemporaryDirectory
+import pickle
 import unittest
 from datetime import datetime, timedelta
-import pickle
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from app import config
-from app import cache
+from app import cache, config
 from app.routers.models import BaseModel
 
 
@@ -14,11 +13,6 @@ class TestCache(unittest.TestCase):
         self._cache_dir = Path(TemporaryDirectory().name)
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         self._cache = cache.data_cache("test_data_kind", str(self._cache_dir))
-
-    #def tearDown(self):
-        # for file in self._cache_dir.iterdir():
-            # file.unlink()
-        # self._cache_dir.rmdir()
 
     def test_fetch_and_update(self):
         self.assertIsNone(self._cache.fetch_and_update(["key1", "key2"]))

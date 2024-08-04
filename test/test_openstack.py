@@ -15,7 +15,7 @@ class TestOpenstackGate(asynctest.TestCase):
 
     async def setUp(self):
         self.maxDiff = None
-        os.environ["SWM_TEST_CONFIG"] = "test/openstack.json"
+        os.environ["SWM_TEST_CONFIG"] = "test/data/openstack.json"
         self.proc = Process(
             target=uvicorn.run,
             args=("app.main:app",),

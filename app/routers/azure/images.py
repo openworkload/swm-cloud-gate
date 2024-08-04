@@ -1,4 +1,3 @@
-import http
 import logging
 import traceback
 
@@ -39,7 +38,7 @@ async def get_image_info(
             return convert_to_image(image)
     except Exception as e:
         return {"error": traceback.format_exception(e)}
-    raise HTTPException(status_code=http.client.NOT_FOUND, error="Image not found")
+    return {"error": "Image not found"}
 
 
 @ROUTER.get("/azure/images")

@@ -1,7 +1,10 @@
 import base64
+import datetime
 import json
 import logging
+import os
 import typing
+import uuid
 
 import jinja2
 from azure.identity import CertificateCredential
@@ -20,6 +23,8 @@ CLOUD_INIT_YAML = "app/routers/azure/templates/cloud-init.yaml"
 
 class AzureConnector(BaseConnector):
     def __init__(self) -> None:
+        self._compute_client = None
+        self._resource_client = None
         super().__init__("azure")
 
     def reinitialize(
@@ -38,6 +43,8 @@ class AzureConnector(BaseConnector):
         app_id: str,
         pem_data: bytes,
     ) -> None:
+        if os.getenv("SWM_TEST_CONFIG", None):
+            return
         if subscription_id and tenant_id and app_id and len(pem_data):
             credential = CertificateCredential(
                 tenant_id=tenant_id,
@@ -178,23 +185,17 @@ class AzureConnector(BaseConnector):
         node_images: list[VirtualMachineImage] = []
         if "images" in self._test_responses:
             for it in self._test_responses["images"]:
-                node_images.append(
-                    VirtualMachineImage(
-                        id=it["id"],
-                        name=it["name"],
-                        location=it["location"],
-                        publichser=it["publisher"],
-                        offer=it["offer"],
-                        skus=it["skus"],
-                        version=it["version"],
-                        plan=it["plan"],
-                        os_disk_image=it["os_disk_image"],
-                        data_disk_images=it["data_disk_images"],
-                        automatic_os_upgrade_properties=it["automatic_os_upgrade_properties"],
-                        hyper_vgeneration=it["hyper_vgeneration"],
-                        features=it["features"],
-                    )
+                vm_image = VirtualMachineImage(
+                    id=it["id"],
+                    name=it["name"],
+                    location=it["location"],
+                    publisher=it["publisher"],
+                    offer=it["offer"],
+                    skus=it["skus"],
+                    version=it["version"],
                 )
+                vm_image.extra = {}
+                node_images.append(vm_image)
             return node_images
         LOG.debug(f"List images: location={location}, publisher={publisher}, offer={offer}, skus={skus}")
         if skus:
@@ -250,6 +251,11 @@ class AzureConnector(BaseConnector):
         return script
 
     def get_resource_group(self, resource_group_name: str) -> typing.Dict[str, typing.Any]:
+        if "resource_groups" in self._test_responses:
+            for it in self.list_resource_groups():
+                if it["name"] == resource_group_name:
+                    return it
+            return {}
         prefix = self._get_resource_prefix_no_job_id()
         if not resource_group_name.startswith(prefix):
             return None
@@ -309,10 +315,19 @@ class AzureConnector(BaseConnector):
         location: str,
         ports: str,
     ) -> str:
-        # TODO use count and ports
-
         resource_prefix = self._get_resource_prefix(job_id)
         resource_group_name = self._get_resource_group_name(resource_prefix)
+
+        if self._test_responses:
+            id = str(uuid.uuid4())
+            time = datetime.datetime.now().isoformat()
+            new_part = {
+                "id": id,
+                "name": resource_group_name,
+            }
+            self._test_responses.setdefault("resource_groups", []).append(new_part)
+            return {"id": id, "name": resource_group_name}
+
         resource_group_creation_result = self._resource_client.resource_groups.create_or_update(
             resource_group_name, {"location": location}
         )
@@ -349,6 +364,11 @@ class AzureConnector(BaseConnector):
         return deployment_async_operation.result()
 
     def delete_resource_group(self, resource_group_name: str) -> str | None:
+        if "resource_groups" in self._test_responses:
+            for it in self.list_resource_groups():
+                if it["name"] == resource_group_name:
+                    return "Deletion started"
+            return None
         if self._resource_client.resource_groups.begin_delete(resource_group_name):
             return "Deletion started"
         return None
@@ -356,6 +376,27 @@ class AzureConnector(BaseConnector):
     def find_image(
         self, location: str, publisher: str, offer: str, sku: str, version: str
     ) -> VirtualMachineImage | None:
+        if "images" in self._test_responses:
+            for it in self._test_responses["images"]:
+                if (
+                    it["location"] == location
+                    and it["publisher"] == publisher
+                    and it["offer"] == offer
+                    and it["skus"] == sku
+                    and it["version"] == version
+                ):
+                    vm_image = VirtualMachineImage(
+                        id=it["id"],
+                        name=it["name"],
+                        location=it["location"],
+                        publisher=it["publisher"],
+                        offer=it["offer"],
+                        skus=it["skus"],
+                        version=it["version"],
+                    )
+                    vm_image.extra = {}
+                    return vm_image
+            return {}
         if azure_image := self._compute_client.virtual_machine_images.get(
             location=location,
             publisher_name=publisher,
@@ -363,7 +404,6 @@ class AzureConnector(BaseConnector):
             skus=sku,
             version=version,
         ):
-
             azure_image.extra: dict[str, str] = {"sku": sku, "publisher": publisher, "offer": offer, "version": version}
             return azure_image
         return None
