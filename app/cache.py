@@ -91,7 +91,7 @@ class Cache:
     def _read(self, file_path: Path) -> list[tuple[datetime, list[str], list[BaseModel]]]:
         LOG.debug(f"Read cache: {file_path}")
         try:
-            with shelve.open(file_path) as shelf:  # nosec B301
+            with shelve.open(str(file_path)) as shelf:  # nosec B301
                 return shelf["azure"]
         except EOFError as e:
             LOG.debug(f"Cannot load cache file {file_path}: {e}")
@@ -100,7 +100,7 @@ class Cache:
         return []
 
     def _write(self, file_path: Path, data: list[tuple[datetime, list[str], list[BaseModel]]]) -> None:
-        with shelve.open(file_path) as shelf_file:  # nosec B301
+        with shelve.open(str(file_path)) as shelf_file:  # nosec B301
             shelf_file["azure"] = data
 
 
