@@ -1,5 +1,4 @@
 import base64
-import datetime
 import json
 import logging
 import os
@@ -320,7 +319,6 @@ class AzureConnector(BaseConnector):
 
         if self._test_responses:
             id = str(uuid.uuid4())
-            time = datetime.datetime.now().isoformat()
             new_part = {
                 "id": id,
                 "name": resource_group_name,

@@ -1,6 +1,6 @@
 import atexit
 import logging
-import pickle
+import shelve  # nosec B403
 from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -37,7 +37,7 @@ class Cache:
 
     def fetch_and_update(self, key: list[str]) -> list[BaseModel] | None:
         LOG.debug(f"Try to fetch {self._data_kind} from in-memory cache by key: {key}")
-        for i, (timestamp, cached_key, cached_value) in enumerate(self._data[:]):
+        for timestamp, cached_key, cached_value in self._data[:]:
             if timestamp >= datetime.now() - timedelta(seconds=self._settings.cache_expire):
                 if key == cached_key:
                     return cached_value
@@ -52,7 +52,7 @@ class Cache:
         found = False
         now = datetime.now()
         fresh_timestamp = now - timedelta(seconds=self._settings.cache_expire)
-        for i, (timestamp, cached_key, cached_value) in enumerate(self._data):
+        for timestamp, cached_key, cached_value in self._data:
             if cached_key == key:
                 if timestamp < fresh_timestamp:
                     deleted += 1
@@ -91,8 +91,8 @@ class Cache:
     def _read(self, file_path: Path) -> list[tuple[datetime, list[str], list[BaseModel]]]:
         LOG.debug(f"Read cache: {file_path}")
         try:
-            with open(file_path, "rb") as file:
-                return pickle.load(file)
+            with shelve.open(file_path) as shelf:  # nosec B301
+                return shelf["azure"]
         except EOFError as e:
             LOG.debug(f"Cannot load cache file {file_path}: {e}")
         except FileNotFoundError as e:
@@ -100,8 +100,8 @@ class Cache:
         return []
 
     def _write(self, file_path: Path, data: list[tuple[datetime, list[str], list[BaseModel]]]) -> None:
-        with open(file_path, "wb") as file:
-            pickle.dump(data, file)
+        with shelve.open(file_path) as shelf_file:  # nosec B301
+            shelf_file["azure"] = data
 
 
 @lru_cache(maxsize=64)

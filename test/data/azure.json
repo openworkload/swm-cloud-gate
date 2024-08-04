@@ -1,0 +1,67 @@
+[
+  {
+    "provider": "azure",
+    "requests": {
+      "images": [
+        {
+          "id": "i1",
+          "name": "image1",
+          "status": "creating",
+          "location": "test",
+          "publisher": "test",
+          "offer": "test",
+          "skus": "test",
+          "version": "1.2"
+        },
+        {
+          "id": "i2",
+          "name": "cirros",
+          "status": "created",
+          "location": "test",
+          "publisher": "test",
+          "offer": "test",
+          "skus": "test",
+          "version": "1.1"
+        }
+      ],
+      "sizes": [
+        {
+          "id": "p1",
+          "name": "flavor1",
+          "number_of_cores": 2,
+          "memory_in_mb": 1073,
+          "os_disk_size_in_mb": 123,
+          "resource_disk_size_in_mb": 12884,
+          "bandwidth": 500,
+          "swap": 0,
+          "ephemeral_disk": 0,
+          "price": 3,
+          "max_data_disk_count": 1
+        },
+        {
+          "id": "p2",
+          "name": "flavor2",
+          "number_of_cores": 8,
+          "memory_in_mb": 2147,
+          "os_disk_size_in_mb": 123,
+          "resource_disk_size_in_mb": 154618,
+          "bandwidth": 100,
+          "swap": 100,
+          "ephemeral_disk": 0,
+          "price": 8,
+          "max_data_disk_count": 1
+        }
+      ],
+      "resource_groups": [
+        {
+          "id": "rg1",
+          "name": "rg1"
+        },
+        {
+          "id": "rg2",
+          "name": "rg2"
+        }
+      ]
+    }
+  }
+]

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from app import cache, config
+from app import cache
 from app.routers.models import BaseModel
 
 
