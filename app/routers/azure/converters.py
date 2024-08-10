@@ -19,7 +19,7 @@ def convert_to_flavor(data: VirtualMachineSize) -> Flavor:
         cpus=data.number_of_cores,
         mem=data.memory_in_mb,
         storage=data.resource_disk_size_in_mb,
-        price=0,
+        price=data.extra.get("price", 0.0),
     )
 
 

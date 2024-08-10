@@ -7,9 +7,10 @@ import uuid
 
 import jinja2
 from azure.identity import CertificateCredential
+from azure.mgmt.commerce import UsageManagementClient
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.models import VirtualMachineImage, VirtualMachineSize
-from azure.mgmt.resource import ResourceManagementClient
+from azure.mgmt.resource import ResourceManagementClient, SubscriptionClient
 from azure.mgmt.resource.resources.models import DeploymentMode
 
 from ..baseconnector import BaseConnector
@@ -24,6 +25,8 @@ class AzureConnector(BaseConnector):
     def __init__(self) -> None:
         self._compute_client = None
         self._resource_client = None
+        self._commerce_client = None
+        self._subscription = None
         super().__init__("azure")
 
     def reinitialize(
@@ -52,6 +55,8 @@ class AzureConnector(BaseConnector):
             )
             self._compute_client = ComputeManagementClient(credential, subscription_id)
             self._resource_client = ResourceManagementClient(credential, subscription_id)
+            self._commerce_client = UsageManagementClient(credential, subscription_id)
+            self._subscription = SubscriptionClient(credential).subscriptions.get(subscription_id)
         else:
             LOG.error("Not enough parameters provided to initialize Azure connection")
 
@@ -167,18 +172,61 @@ class AzureConnector(BaseConnector):
         if "sizes" in self._test_responses:
             node_sizes = []
             for it in self._test_responses["sizes"]:
-                node_sizes.append(
-                    VirtualMachineSize(
-                        name=it["name"],
-                        number_of_cores=it["number_of_cores"],
-                        os_disk_size_in_mb=it["os_disk_size_in_mb"],
-                        resource_disk_size_in_mb=it["resource_disk_size_in_mb"],
-                        memory_in_mb=it["memory_in_mb"],
-                        max_data_disk_count=it["max_data_disk_count"],
-                    )
+                vm_size = VirtualMachineSize(
+                    name=it["name"],
+                    number_of_cores=it["number_of_cores"],
+                    os_disk_size_in_mb=it["os_disk_size_in_mb"],
+                    resource_disk_size_in_mb=it["resource_disk_size_in_mb"],
+                    memory_in_mb=it["memory_in_mb"],
+                    max_data_disk_count=it["max_data_disk_count"],
                 )
+                vm_size.extra = {"price": 0, "description": "test vm size", "meter_id": ""}
+                node_sizes.append(vm_size)
             return node_sizes
-        return list(self._compute_client.virtual_machine_sizes.list(location))
+
+        size_map: dict[str, VirtualMachineSize] = {}
+        for size in self._compute_client.virtual_machine_sizes.list(location):
+            size_map[size.name] = size
+        return self._add_prices(location, size_map)
+
+    def _add_prices(self, location: str, size_map: dict[str, VirtualMachineSize]) -> list[VirtualMachineSize]:
+        results: list[VirtualMachineSize] = []
+
+        if self._subscription.subscription_policies.quota_id.lower().startswith("payasyougo"):
+            offer_id = "0003P"
+        else:
+            raise Exception("For now only PayAsYouGo offers are supported")
+        filter_string = (
+            f"OfferDurableId eq 'MS-AZR-{offer_id}'"
+            "and Currency eq 'USD' and Locale eq 'en-US' and RegionInfo eq 'US'"
+        )
+        LOG.debug(f"Rates filter: {filter_string}")
+        meters = self._commerce_client.rate_card.get(filter_string).meters
+        LOG.debug(f"Retrieved {len(meters)} meters")
+
+        already_added = set()
+        duplication_counter = 1
+        for meter in meters:
+            if meter.meter_category != "Virtual Machines":
+                continue
+            if meter.meter_name.endswith("Low Priority"):
+                continue
+            parts = meter.meter_region.split(" ")
+            if len(parts) != 2:
+                continue
+            location_from_meter = (parts[1] + parts[0]).lower()
+            if location != location_from_meter:
+                continue
+            for meter_name in meter.meter_name.split("/"):
+                size_name = f"Standard_{meter_name.replace(' ', '_')}"
+                if vm_size := size_map.get(size_name):
+                    vm_size.extra = {"price": meter.meter_rates["0"], "description": meter.meter_sub_category}
+                    if vm_size.name not in already_added:
+                        already_added.add(vm_size.name)
+                        results.append(vm_size)
+                    else:
+                        duplication_counter += 1
+        return results
 
     def list_images(self, location: str, publisher: str, offer: str, skus: str) -> list[VirtualMachineImage]:
         node_images: list[VirtualMachineImage] = []

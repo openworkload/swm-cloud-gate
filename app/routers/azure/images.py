@@ -37,6 +37,7 @@ async def get_image_info(
         if image := CONNECTOR.find_image(location, publisher, offer, sku, version):
             return convert_to_image(image)
     except Exception as e:
+        LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}
     return {"error": "Image not found"}
 
@@ -62,6 +63,7 @@ async def list_images(
         for image in CONNECTOR.list_images(location, publisher, offer, skus):
             image_list.append(convert_to_image(image))
     except Exception as e:
+        LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}
 
     changed, deleted = cache.data_cache("vmimages").update(cache_key, image_list)

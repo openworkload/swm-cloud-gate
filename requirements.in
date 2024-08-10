@@ -29,5 +29,6 @@ apache-libcloud>=3.6.1
 # Azure integration requirements:
 azure-identity
 azure-mgmt-resource
-azure-mgmt-compute
+azure-mgmt-commerce
+azure-mgmt-compute >= 32.0.0
 azure-storage-blob

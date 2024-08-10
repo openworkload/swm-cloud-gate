@@ -27,6 +27,7 @@ autoflake==2.2.1
     # via -r requirements.in
 azure-common==1.1.28
     # via
+    #   azure-mgmt-commerce
     #   azure-mgmt-compute
     #   azure-mgmt-resource
 azure-core==1.29.7
@@ -34,12 +35,16 @@ azure-core==1.29.7
     #   azure-identity
     #   azure-mgmt-core
     #   azure-storage-blob
+    #   msrest
 azure-identity==1.15.0
     # via -r requirements.in
-azure-mgmt-compute==31.0.0
+azure-mgmt-commerce==6.0.0
+    # via -r requirements.in
+azure-mgmt-compute==32.0.0
     # via -r requirements.in
 azure-mgmt-core==1.4.0
     # via
+    #   azure-mgmt-commerce
     #   azure-mgmt-compute
     #   azure-mgmt-resource
 azure-mgmt-resource==23.0.1
@@ -53,7 +58,9 @@ black==24.1a1
 build==1.0.3
     # via pip-tools
 certifi==2023.11.17
-    # via requests
+    # via
+    #   msrest
+    #   requests
 cffi==1.16.0
     # via cryptography
 charset-normalizer==3.3.2
@@ -98,6 +105,7 @@ isodate==0.6.1
     #   azure-mgmt-compute
     #   azure-mgmt-resource
     #   azure-storage-blob
+    #   msrest
 isort==5.13.2
     # via -r requirements.in
 jinja2==3.1.2
@@ -116,6 +124,8 @@ msal==1.26.0
     #   msal-extensions
 msal-extensions==1.1.0
     # via azure-identity
+msrest==0.7.1
+    # via azure-mgmt-commerce
 multidict==6.0.4
     # via
     #   aiohttp
@@ -126,6 +136,8 @@ mypy-extensions==1.0.0
     # via
     #   black
     #   mypy
+oauthlib==3.2.2
+    # via requests-oauthlib
 packaging==23.2
     # via
     #   black
@@ -170,6 +182,10 @@ requests==2.31.0
     #   apache-libcloud
     #   azure-core
     #   msal
+    #   msrest
+    #   requests-oauthlib
+requests-oauthlib==2.0.0
+    # via msrest
 rich==13.7.0
     # via bandit
 ruff==0.1.11
@@ -197,6 +213,7 @@ typed-ast==1.5.4
 typing-extensions==4.9.0
     # via
     #   azure-core
+    #   azure-mgmt-compute
     #   azure-storage-blob
     #   black
     #   mypy

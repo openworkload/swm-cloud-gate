@@ -32,14 +32,15 @@ json=$(curl --request ${REQUEST}\
      --data-raw "${BODY}" \
      ${URL} 2>/dev/null)
 
-table=$(echo "$json" | jq -r '.flavors[] | [.id, .name, .cpus] | @tsv')
+table=$(echo "$json" | jq -r '.flavors[] | [.id, .name, .cpus, .price] | @tsv')
 
 id_width=$(echo "$table" | awk -F'\t' '{print length($1)}' | sort -nr | head -1)
 name_width=$(echo "$table" | awk -F'\t' '{print length($2)}' | sort -nr | head -1)
 cpus_width=$(echo "$table" | awk -F'\t' '{print length($3)}' | sort -nr | head -1)
+price_width=$(echo "$table" | awk -F'\t' '{print length($4)}' | sort -nr | head -1)
 
-printf "%-${id_width}s  %-${name_width}s %-${cpus_width}s\n" "ID" "Name" "CPUs"
-printf "%${id_width}s  %${name_width}s %${cpus_width}s\n" "$(printf '%*s' "$id_width" | tr ' ' '-')" "$(printf '%*s' "$name_width" | tr ' ' '-')" "$(printf '%*s' "$cpus_width" | tr ' ' '-')"
-echo "$table" | while IFS=$'\t' read -r id name; do
-    printf "%-${id_width}s  %-${name_width}s %-${cpus_width}s\n" "$id" "$name" "$cpus"
+printf "%-${id_width}s  %-${name_width}s %-${cpus_width}s %-${price_width}s\n" "ID" "Name" "CPUs" "Price"
+printf "%${id_width}s  %${name_width}s %${cpus_width}s %${price_width}s\n" "$(printf '%*s' "$id_width" | tr ' ' '-')" "$(printf '%*s' "$name_width" | tr ' ' '-')" "$(printf '%*s' "$cpus_width" | tr ' ' '-')" "$(printf '%*s' "$price_width" | tr ' ' '-')"
+echo "$table" | while IFS=$'\t' read -r id name cpus price; do
+    printf "%-${id_width}s  %-${name_width}s %-${cpus_width}s %-${price_width}s\n" "$id" "$name" "$cpus" "$price"
 done

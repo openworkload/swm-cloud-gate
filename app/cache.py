@@ -1,6 +1,6 @@
 import atexit
 import logging
-import shelve  # nosec B403
+import pickle  # nosec B403
 from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -91,8 +91,8 @@ class Cache:
     def _read(self, file_path: Path) -> list[tuple[datetime, list[str], list[BaseModel]]]:
         LOG.debug(f"Read cache: {file_path}")
         try:
-            with shelve.open(str(file_path)) as shelf:  # nosec B301
-                return shelf["azure"]
+            with open(file_path, "rb") as file:
+                return pickle.load(file)  # nosec B301
         except EOFError as e:
             LOG.debug(f"Cannot load cache file {file_path}: {e}")
         except FileNotFoundError as e:
@@ -100,8 +100,8 @@ class Cache:
         return []
 
     def _write(self, file_path: Path, data: list[tuple[datetime, list[str], list[BaseModel]]]) -> None:
-        with shelve.open(str(file_path)) as shelf_file:  # nosec B301
-            shelf_file["azure"] = data
+        with open(file_path, "wb") as file:
+            pickle.dump(data, file)  # nosec B301
 
 
 @lru_cache(maxsize=64)

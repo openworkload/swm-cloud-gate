@@ -63,6 +63,7 @@ async def create_partition(
         ):
             return {"partition": convert_to_partition(result)}
     except Exception as e:
+        LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}
     return {"error": "Cannot create Azure deployment"}
 
@@ -81,6 +82,7 @@ async def list_partitions(
             partitions.append(convert_to_partition(resource_group_info))
         return {"partitions": partitions}
     except Exception as e:
+        LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}
 
 
@@ -97,6 +99,7 @@ async def get_partition_info(
         if result := CONNECTOR.get_resource_group(partitionname):
             return convert_to_partition(result)
     except Exception as e:
+        LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}
     return {"error": "Partition not found"}
 
@@ -114,4 +117,5 @@ async def delete_partition(
         result = CONNECTOR.delete_resource_group(partitionname)
         return {"result": result}
     except Exception as e:
+        LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}

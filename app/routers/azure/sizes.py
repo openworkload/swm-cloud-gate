@@ -35,6 +35,7 @@ async def list_flavors(
             for item in sizes:
                 flavor_list.append(convert_to_flavor(item))
     except Exception as e:
+        LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}
 
     changed, deleted = cache.data_cache("flavors").update([location], flavor_list)
