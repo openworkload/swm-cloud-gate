@@ -3,9 +3,9 @@
 IMAGE_ID=$1
 #IMAGE_ID=/Subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/Providers/Microsoft.Compute/Locations/eastus/Publishers/Canonical/ArtifactTypes/VMImage/Offers/0001-com-ubuntu-server-jammy/Skus/22_04-lts/Versions/22.04.202407010
 
-source ~/.swm/azure.env
 source $(dirname "$0")/helpers.sh
 
+CREDS=$(read_credentials azure)
 CERT=~/.swm/cert.pem
 KEY=~/.swm/key.pem
 CA=/opt/swm/spool/secure/cluster/ca-chain-cert.pem
@@ -16,14 +16,18 @@ HOST=$(hostname -s)
 
 REQUEST=GET
 HEADER1="Accept: application/json"
-HEADER2="subscriptionid: ${SUBSCRIPTION_ID}"
-HEADER3="tenantid: ${TENANT_ID}"
-HEADER4="appid: ${APP_ID}"
+HEADER2="subscriptionid: $(echo $CREDS | jq -r '.subscription_id')"
+HEADER3="tenantid: $(echo $CREDS | jq -r '.tenant_id')"
+HEADER4="appid: $(echo $CREDS | jq -r '.app_id')"
 URL="https://${HOST}:${PORT}/azure/images/${IMAGE_ID}"
 BODY='{"pem_data": '${PEM_DATA}'}'
 
 echo $URL
 echo
+
+echo $HEADER2
+echo $HEADER3
+echo $HEADER4
 
 json=$(curl --request ${REQUEST}\
      --cacert ${CA}\

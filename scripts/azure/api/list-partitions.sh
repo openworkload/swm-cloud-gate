@@ -3,9 +3,9 @@
 PARTIOTION_ID=$1
 #PARTITION_ID=/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/swm-02ccc5c0-resource-group
 
-source ~/.swm/azure.env
 source $(dirname "$0")/helpers.sh
 
+CREDS=$(read_credentials azure)
 CERT=~/.swm/cert.pem
 KEY=~/.swm/key.pem
 CA=/opt/swm/spool/secure/cluster/ca-chain-cert.pem
@@ -16,9 +16,9 @@ HOST=$(hostname -s)
 
 REQUEST=GET
 HEADER1="Accept: application/json"
-HEADER2="subscriptionid: ${SUBSCRIPTION_ID}"
-HEADER3="tenantid: ${TENANT_ID}"
-HEADER4="appid: ${APP_ID}"
+HEADER2="subscriptionid: $(echo $CREDS | jq -r '.subscription_id')"
+HEADER3="tenantid: $(echo $CREDS | jq -r '.tenant_id')"
+HEADER4="appid: $(echo $CREDS | jq -r '.app_id')"
 URL="https://${HOST}:${PORT}/azure/partitions"
 BODY='{"pem_data": '${PEM_DATA}'}'
 

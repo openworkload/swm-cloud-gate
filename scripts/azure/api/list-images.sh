@@ -1,14 +1,13 @@
 #!/bin/bash
 
-source ~/.swm/azure.env
 source $(dirname "$0")/helpers.sh
 
+CREDS=$(read_credentials azure)
 CERT=~/.swm/cert.pem
 KEY=~/.swm/key.pem
 CA=/opt/swm/spool/secure/cluster/ca-chain-cert.pem
 PEM_DATA=$(make_pem_data $CERT $KEY)
 
-LOCATION=eastus
 PUBLISHER=Canonical
 OFFER=0001-com-ubuntu-server-jammy
 #SKUS=22_04-lts
@@ -18,10 +17,10 @@ HOST=$(hostname -s)
 
 REQUEST=GET
 HEADER1="Accept: application/json"
-HEADER2="subscriptionid: ${SUBSCRIPTION_ID}"
-HEADER3="tenantid: ${TENANT_ID}"
-HEADER4="appid: ${APP_ID}"
-HEADER5="location: ${LOCATION}"
+HEADER2="subscriptionid: $(echo $CREDS | jq -r '.subscription_id')"
+HEADER3="tenantid: $(echo $CREDS | jq -r '.tenant_id')"
+HEADER4="appid: $(echo $CREDS | jq -r '.app_id')"
+HEADER5="location: $(echo $CREDS | jq -r '.location')"
 HEADER6="publisher: ${PUBLISHER}"
 HEADER7="offer: ${OFFER}"
 HEADER8="skus: ${SKUS}"
