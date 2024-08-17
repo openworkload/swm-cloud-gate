@@ -32,6 +32,7 @@ azure-common==1.1.28
     #   azure-mgmt-resource
 azure-core==1.29.7
     # via
+    #   -r requirements.in
     #   azure-identity
     #   azure-mgmt-core
     #   azure-storage-blob

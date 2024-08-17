@@ -1,13 +1,13 @@
 #!/bin/bash
 
 PARTIOTION_ID=$1
-#PARTITION_ID=/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/swm-02ccc5c0-resource-group
+#PARTITION_ID=/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/swm-3579a076-resource-group
 
 source $(dirname "$0")/helpers.sh
 
 CREDS=$(read_credentials azure)
-CERT=~/.swm/cert.pem
-KEY=~/.swm/key.pem
+CERT=/opt/swm/spool/secure/node/cert.pem
+KEY=/opt/swm/spool/secure/node/key.pem
 CA=/opt/swm/spool/secure/cluster/ca-chain-cert.pem
 PEM_DATA=$(make_pem_data $CERT $KEY)
 
@@ -16,9 +16,9 @@ HOST=$(hostname -s)
 
 REQUEST=DELETE
 HEADER1="Accept: application/json"
-HEADER2="subscriptionid: $(echo $CREDS | jq -r '.subscription_id')"
-HEADER3="tenantid: $(echo $CREDS | jq -r '.tenant_id')"
-HEADER4="appid: $(echo $CREDS | jq -r '.app_id')"
+HEADER2="subscriptionid: $(echo $CREDS | jq -r '.subscriptionid')"
+HEADER3="tenantid: $(echo $CREDS | jq -r '.tenantid')"
+HEADER4="appid: $(echo $CREDS | jq -r '.appid')"
 URL="https://${HOST}:${PORT}/azure/partitions/$PARTIOTION_ID"
 BODY='{"pem_data": '${PEM_DATA}'}'
 

@@ -6,8 +6,8 @@ PARTITION_ID=$1
 source $(dirname "$0")/helpers.sh
 
 CREDS=$(read_credentials azure)
-CERT=~/.swm/cert.pem
-KEY=~/.swm/key.pem
+CERT=/opt/swm/spool/secure/node/cert.pem
+KEY=/opt/swm/spool/secure/node/key.pem
 CA=/opt/swm/spool/secure/cluster/ca-chain-cert.pem
 PEM_DATA=$(make_pem_data $CERT $KEY)
 
@@ -16,8 +16,8 @@ HOST=$(hostname -s)
 
 REQUEST=GET
 HEADER1="Accept: application/json"
-HEADER2="tenantid: $(echo $CREDS | jq -r '.tenant_id')"
-HEADER3="appid: $(echo $CREDS | jq -r '.app_id')"
+HEADER2="tenantid: $(echo $CREDS | jq -r '.tenantid')"
+HEADER3="appid: $(echo $CREDS | jq -r '.appid')"
 URL="https://${HOST}:${PORT}/azure/partitions/${PARTITION_ID}"
 BODY='{"pem_data": '${PEM_DATA}'}'
 

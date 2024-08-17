@@ -1,13 +1,14 @@
 import logging
 import traceback
+import http
 
-from fastapi import APIRouter, Body, Header
+from fastapi import APIRouter, Body, Header, HTTPException
 
 from app import cache
 
 from ..models import HttpBody, ImageInfo
 from .connector import AzureConnector
-from .converters import convert_to_image
+from .converters import convert_to_image, extract_parameters
 
 LOG = logging.getLogger("swm")
 CONNECTOR = AzureConnector()
@@ -38,8 +39,10 @@ async def get_image_info(
             return convert_to_image(image)
     except Exception as e:
         LOG.error(traceback.format_exception(e))
-        return {"error": traceback.format_exception(e)}
-    return {"error": "Image not found"}
+    raise HTTPException(
+        status_code=http.client.NOT_FOUND,
+        detail="Image not found",
+    )
 
 
 @ROUTER.get("/azure/images")
@@ -47,16 +50,34 @@ async def list_images(
     subscriptionid: str = EMPTY_HEADER,
     tenantid: str = EMPTY_HEADER,
     appid: str = EMPTY_HEADER,
-    location: str = EMPTY_HEADER,
-    publisher: str = EMPTY_HEADER,
-    offer: str = EMPTY_HEADER,
-    skus: str = EMPTY_HEADER,
+    extra: str = EMPTY_HEADER,
     body: HttpBody = EMPTY_BODY,
 ) -> dict[str, str | list[ImageInfo]]:
+
+    extra_map = extract_parameters(extra)
+    location = extra_map.get("location")
+    publisher = extra_map.get("publisher")
+    offer = extra_map.get("offer")
+    skus = extra_map.get("skus", "")
+
+    if not location:
+        msg = "Extra parameter is not specified: location"
+        LOG.warning(msg)
+        return {"error": msg}
+    if not publisher:
+        msg = "Extra parameter is not specified: publisher"
+        LOG.warning(msg)
+        return {"error": msg}
+    if not offer:
+        msg = "Extra parameter is not specified: offer"
+        LOG.warning(msg)
+        return {"error": msg}
+
     cache_key = [location, publisher, offer, skus] if skus else [location, publisher, offer]
     if data := cache.data_cache("vmimages").fetch_and_update(cache_key):
         LOG.debug(f"VM images are taken from cache (amount={len(data)})")
         return {"images": data}
+
     CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
     image_list: list[ImageInfo] = []
     try:
@@ -64,7 +85,10 @@ async def list_images(
             image_list.append(convert_to_image(image))
     except Exception as e:
         LOG.error(traceback.format_exception(e))
-        return {"error": traceback.format_exception(e)}
+        raise HTTPException(
+            status_code=http.client.INTERNAL_SERVER_ERROR,
+            detail="Cannot get images",
+        )
 
     changed, deleted = cache.data_cache("vmimages").update(cache_key, image_list)
     if changed or deleted:

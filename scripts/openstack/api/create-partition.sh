@@ -11,8 +11,9 @@ REQUEST=POST
 HEADER1="Accept: application/json"
 HEADER2="username: demo1"
 HEADER3="password: demo1"
-HEADER4="partname: part1"
-HEADER5="tenantname: demo1"
+HEADER4="tenantname: demo1"
+
+HEADER5="partname: part1"
 HEADER6="vmimage: cirros"
 HEADER7="flavorname: m1.micro"
 HEADER8="keyname: demo1"

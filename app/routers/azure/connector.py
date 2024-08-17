@@ -6,12 +6,13 @@ import typing
 import uuid
 
 import jinja2
+from azure.core.exceptions import ResourceNotFoundError
 from azure.identity import CertificateCredential
 from azure.mgmt.commerce import UsageManagementClient
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.compute.models import VirtualMachineImage, VirtualMachineSize
 from azure.mgmt.resource import ResourceManagementClient, SubscriptionClient
-from azure.mgmt.resource.resources.models import DeploymentMode
+from azure.mgmt.resource.resources.models import DeploymentExtended, DeploymentMode
 
 from ..baseconnector import BaseConnector
 
@@ -63,6 +64,7 @@ class AzureConnector(BaseConnector):
     def _get_deployment_properties(
         self,
         job_id: str,
+        partition_name: str,
         flavor_name: str,
         os_version: str,
         username: str,
@@ -74,6 +76,7 @@ class AzureConnector(BaseConnector):
             template = json.load(template_file)
         template_parameters = self._get_template_parameters(
             job_id,
+            partition_name,
             flavor_name,
             os_version,
             username,
@@ -124,6 +127,7 @@ class AzureConnector(BaseConnector):
     def _get_template_parameters(
         self,
         job_id: str,
+        partition_name: str,
         flavor_name: str,
         os_version: str,
         username: str,
@@ -137,7 +141,7 @@ class AzureConnector(BaseConnector):
             cloud_init_script=self._indent_lines(cloud_init_script, 6),
         )
         return {
-            "resourcePrefix": {"value": self._get_resource_prefix(job_id)},
+            "resourcePrefix": {"value": partition_name},
             "adminUsername": {"value": username},
             "adminPasswordOrKey": {"value": user_pub_key},
             "osVersion": {"value": os_version},
@@ -156,17 +160,14 @@ class AzureConnector(BaseConnector):
             key_content = file.read()
         return key_content + cert_content
 
-    def _get_resource_prefix_no_job_id(self) -> str:
+    def _get_resource_prefix(self) -> str:
         return "swm-"
 
-    def _get_resource_prefix(self, job_id: str) -> str:
-        return self._get_resource_prefix_no_job_id() + job_id.split("-")[0]
+    def _get_resource_group_name(self, partition_name: str) -> str:
+        return f"{partition_name}-resource-group"
 
-    def _get_resource_group_name(self, resource_prefix: str) -> str:
-        return f"{resource_prefix}-resource-group"
-
-    def _get_deployment_name(self, resource_prefix: str) -> str:
-        return f"{resource_prefix}-deployment"
+    def _get_deployment_name(self, partition_name: str) -> str:
+        return f"{partition_name}-deployment"
 
     def list_sizes(self, location: str) -> list[VirtualMachineSize]:
         if "sizes" in self._test_responses:
@@ -303,11 +304,14 @@ class AzureConnector(BaseConnector):
                 if it["name"] == resource_group_name:
                     return it
             return {}
-        prefix = self._get_resource_prefix_no_job_id()
+        prefix = self._get_resource_prefix()
         if not resource_group_name.startswith(prefix):
             return None
-        if resource_group := self._resource_client.resource_groups.get(resource_group_name):
-            return self._get_resource_group_info(resource_group.id, resource_group.name)
+        try:
+            if resource_group := self._resource_client.resource_groups.get(resource_group_name):
+                return self._get_resource_group_info(resource_group.id, resource_group.name)
+        except ResourceNotFoundError:
+            LOG.info(f"Resource group does not exist in Azure: {resource_group_name}")
         return None
 
     def list_resource_groups(self) -> list[dict[str, typing.Any]]:
@@ -318,7 +322,7 @@ class AzureConnector(BaseConnector):
             return resource_groups
         group_resources: list[dict[str, list[typing.Any]]] = []
         if resource_groups := self._resource_client.resource_groups.list():
-            prefix = self._get_resource_prefix_no_job_id()
+            prefix = self._get_resource_prefix()
             for resource_group in resource_groups:
                 if not resource_group.name.startswith(prefix):
                     continue
@@ -351,6 +355,7 @@ class AzureConnector(BaseConnector):
     def create_deployment(
         self,
         job_id: str,
+        partition_name: str,
         os_version: str,
         container_image: str,
         container_registry_username: str,
@@ -361,9 +366,8 @@ class AzureConnector(BaseConnector):
         runtime: str,
         location: str,
         ports: str,
-    ) -> str:
-        resource_prefix = self._get_resource_prefix(job_id)
-        resource_group_name = self._get_resource_group_name(resource_prefix)
+    ) -> tuple[DeploymentExtended, str]:
+        resource_group_name = self._get_resource_group_name(partition_name)
 
         if self._test_responses:
             id = str(uuid.uuid4())
@@ -390,9 +394,10 @@ class AzureConnector(BaseConnector):
             runtime_params,
         )
 
-        deployment_name = self._get_deployment_name(resource_prefix)
+        deployment_name = self._get_deployment_name(partition_name)
         deployment_properties = self._get_deployment_properties(
             job_id,
+            partition_name,
             flavor_name,
             os_version,
             username,
@@ -407,7 +412,7 @@ class AzureConnector(BaseConnector):
         )
 
         LOG.info(f"Deploying resource group {resource_group_name}, deployment: {deployment_name}")
-        return deployment_async_operation.result()
+        return deployment_async_operation.result(), resource_group_name
 
     def delete_resource_group(self, resource_group_name: str) -> str | None:
         if "resource_groups" in self._test_responses:

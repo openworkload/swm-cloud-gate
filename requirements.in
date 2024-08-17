@@ -27,6 +27,7 @@ dataclasses==0.6
 apache-libcloud>=3.6.1
 
 # Azure integration requirements:
+azure-core
 azure-identity
 azure-mgmt-resource
 azure-mgmt-commerce

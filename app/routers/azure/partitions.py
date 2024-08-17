@@ -1,8 +1,9 @@
 import logging
 import traceback
 import typing
+import http
 
-from fastapi import APIRouter, Body, Header
+from fastapi import APIRouter, Body, Header, HTTPException
 
 from ..models import HttpBody, PartInfo
 from .connector import AzureConnector
@@ -20,14 +21,15 @@ async def create_partition(
     subscriptionid: str = EMPTY_HEADER,
     tenantid: str = EMPTY_HEADER,
     appid: str = EMPTY_HEADER,
-    osversion: str = EMPTY_HEADER,
-    containerimage: str = EMPTY_HEADER,
     containerregistryuser: str = EMPTY_HEADER,
     containerregistrypass: str = EMPTY_HEADER,
+    osversion: str = EMPTY_HEADER,
+    containerimage: str = EMPTY_HEADER,
     flavorname: str = EMPTY_HEADER,
     username: str = EMPTY_HEADER,
     count: str = EMPTY_HEADER,
     jobid: str = EMPTY_HEADER,
+    partname: str = EMPTY_HEADER,
     runtime: str = EMPTY_HEADER,
     location: str = EMPTY_HEADER,
     ports: str = EMPTY_HEADER,
@@ -38,6 +40,7 @@ async def create_partition(
     LOG.debug(f" * subscription: {subscriptionid}")
     LOG.debug(f" * tenant: {tenantid}")
     LOG.debug(f" * app: {appid}")
+    LOG.debug(f" * partition: {partname}")
     LOG.debug(f" * osversion: {osversion}")
     LOG.debug(f" * containerimage: {containerimage}")
     LOG.debug(f" * flavor: {flavorname}")
@@ -48,8 +51,9 @@ async def create_partition(
     LOG.debug(f" * ports: {ports}")
     CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
     try:
-        if result := CONNECTOR.create_deployment(
+        result, resource_group_name = CONNECTOR.create_deployment(
             jobid,
+            partname,
             osversion,
             containerimage,
             containerregistryuser,
@@ -60,8 +64,9 @@ async def create_partition(
             runtime,
             location,
             ports,
-        ):
-            return {"partition": convert_to_partition(result)}
+        )
+        if result:
+            return {"partition": convert_to_partition(result, resource_group_name)}
     except Exception as e:
         LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}
@@ -79,15 +84,15 @@ async def list_partitions(
     try:
         partitions: typing.List[PartInfo] = []
         for resource_group_info in CONNECTOR.list_resource_groups():
-            partitions.append(convert_to_partition(resource_group_info))
+            partitions.append(convert_to_partition(resource_group_info, resource_group_info.name))
         return {"partitions": partitions}
     except Exception as e:
         LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}
 
 
-@ROUTER.get("/azure/partitions//subscriptions/{subscriptionid}/resourceGroups/{partitionname}")
-async def get_partition_info(
+@ROUTER.get("/azure/partitions//subscriptions/{subscriptionid}/resourceGroups/{partitionname}-resource-group")
+async def get_partition_by_id(
     subscriptionid: str,
     partitionname: str,
     tenantid: str = EMPTY_HEADER,
@@ -97,25 +102,52 @@ async def get_partition_info(
     try:
         CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
         if result := CONNECTOR.get_resource_group(partitionname):
-            return convert_to_partition(result)
+            return convert_to_partition(result, partitionname)
     except Exception as e:
         LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}
-    return {"error": "Partition not found"}
+    raise HTTPException(
+        status_code=http.client.NOT_FOUND,
+        detail="Partition not found",
+    )
 
 
-@ROUTER.delete("/azure/partitions//subscriptions/{subscriptionid}/resourceGroups/{partitionname}")
+@ROUTER.get("/azure/partitions/{partitionname}")
+async def get_partition_by_name(
+    partitionname: str,
+    subscriptionid: str = EMPTY_HEADER,
+    tenantid: str = EMPTY_HEADER,
+    appid: str = EMPTY_HEADER,
+    body: HttpBody = EMPTY_BODY,
+):
+    resource_group_name = partitionname + "-resource-group"
+    try:
+        CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
+        if result := CONNECTOR.get_resource_group(resource_group_name):
+            return convert_to_partition(result, partitionname)
+    except Exception as e:
+        LOG.error(traceback.format_exception(e))
+    raise HTTPException(
+        status_code=http.client.NOT_FOUND,
+        detail="Partition not found",
+    )
+
+
+@ROUTER.delete("/azure/partitions//subscriptions/{subscriptionid}/resourceGroups/{resourcegroup}")
 async def delete_partition(
     subscriptionid: str,
-    partitionname: str,
+    resourcegroup: str,
     tenantid: str = EMPTY_HEADER,
     appid: str = EMPTY_HEADER,
     body: HttpBody = EMPTY_BODY,
 ):
     try:
         CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
-        result = CONNECTOR.delete_resource_group(partitionname)
-        return {"result": result}
+        if result := CONNECTOR.delete_resource_group(resourcegroup):
+            return {"result": result}
     except Exception as e:
         LOG.error(traceback.format_exception(e))
-        return {"error": traceback.format_exception(e)}
+    raise HTTPException(
+        status_code=http.client.INTERNAL_SERVER_ERROR,
+        detail="Cannot delete partition",
+    )
