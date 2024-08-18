@@ -1,8 +1,16 @@
 #!/bin/bash -ex
 
 HOST_NAME=$(hostname)
+SWM_ROOT="/opt/swm"
 
-function download_swm_worker() {
+create_directories() {
+    if [[ "{{ swm_source }}" == "ssh" ]]; then
+        echo $(date) ": create directory $SWM_ROOT"
+        mkdir -p "$SWM_ROOT"
+    fi
+}
+
+setup_swm_worker() {
     echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source }}"
 
     if [[ "{{ swm_source }}" == "ssh" ]]; then
@@ -10,17 +18,19 @@ function download_swm_worker() {
         echo $(date) ": ensure swm worker is installed via ssh"
 
         local check_interval=15
-        local target_directory="/opt/swm"
-        local file_path="$target_directory/swm-worker.tar.gz"
-
-        mkdir -p "$target_directory"
+        local file_path="$SWM_ROOT/swm-worker.tar.gz"
 
         while true; do
             if [[ -f "$file_path" ]]; then
                 echo "$(date): file $file_path found"
                 sleep 10
-                tar -xzf "$file_path" -C "$target_directory"
-                break
+                tar -xzf "$file_path" -C "$SWM_ROOT"
+                if [ $? -eq 0 ]; then
+                    echo "$(date): worker archive has been unpacked successfully"
+                    break
+                else
+                    echo "$(date): worker archive is not ready yet => will repeat in a while"
+                fi
             else
               echo "$(date): file not found, checking again in $check_interval seconds..."
                 sleep $check_interval
@@ -59,7 +69,7 @@ function download_swm_worker() {
     ps aux | grep swm
 }
 
-function setup_network() {
+setup_network() {
     GATEWAY_IP=$(ip -4 addr show $(ip -4 route list 0/0 | awk -F" " "{ print \$5 }") | grep -oP "(?<=inet\\s)\\d+(\\.\\d+){3}")
     IS_MAIN=true
     echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$GATEWAY_IP, master: ${IS_MAIN})"
@@ -69,7 +79,7 @@ function setup_network() {
     echo
 }
 
-function setup_mounts() {
+setup_mounts() {
     if [ $IS_MAIN == "true" ];
     then
         echo "/home $PRIVATE_SUBNET_CIDR(rw,async,no_root_squash)" | sed "s/\\/25/\\/255.255.255.0/g" >> /etc/exports
@@ -98,7 +108,7 @@ function setup_mounts() {
     echo
 }
 
-function setup_docker() {
+setup_docker() {
     echo $(date) ": setup docker"
 
     # swm connects to docker via tcp => enable this port listening in the docker daemon:
@@ -116,7 +126,7 @@ function setup_docker() {
     systemctl restart docker
 }
 
-function pull_container_image() {
+pull_container_image() {
     if [ "{{ container_registry_password }}" != "" ]; then
         echo $(date) ": login to the registry: {{ container_registry }}"
         docker login {{ container_registry }} --username {{ container_registry_username }} --password {{ container_registry_password }}
@@ -129,11 +139,12 @@ function pull_container_image() {
     docker images
 }
 
+create_directories
 setup_network
 setup_mounts
 setup_docker
 pull_container_image
-download_swm_worker
+setup_swm_worker
 
 echo
 echo $(date) ": the initialization has finished successfully."
