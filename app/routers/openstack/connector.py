@@ -79,7 +79,9 @@ class OpenStackConnector(BaseConnector):
             node_images = []
             for it in self._test_responses["images"]:
                 node_images.append(
-                    NodeImage(id=it["id"], name=it["name"], extra={"status": it["status"]}, driver=self._driver)
+                    NodeImage(
+                        id=it["id"], name=it["name"], extra={"status": it["extra"]["status"]}, driver=self._driver
+                    )
                 )
             return node_images
         return self._driver.list_images()

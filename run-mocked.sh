@@ -5,7 +5,7 @@ mkdir -p $PID_DIR
 PID_FILE=$PID_DIR/pid
 
 source .venv/bin/activate
-export SWM_TEST_CONFIG=test/openstack.json
+export SWM_TEST_CONFIG=test/data/responses.json
 trap "rm -f $PID_FILE" EXIT
 ./run.py &
 echo $! > $PID_FILE

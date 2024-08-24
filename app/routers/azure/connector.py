@@ -14,6 +14,8 @@ from azure.mgmt.compute.models import VirtualMachineImage, VirtualMachineSize
 from azure.mgmt.resource import ResourceManagementClient, SubscriptionClient
 from azure.mgmt.resource.resources.models import DeploymentExtended, DeploymentMode
 
+from app import cache
+
 from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
@@ -28,6 +30,7 @@ class AzureConnector(BaseConnector):
         self._resource_client = None
         self._commerce_client = None
         self._subscription = None
+        self._subscription_id = None
         super().__init__("azure")
 
     def reinitialize(
@@ -46,6 +49,7 @@ class AzureConnector(BaseConnector):
         app_id: str,
         pem_data: bytes,
     ) -> None:
+        self._subscription_id = subscription_id
         if os.getenv("SWM_TEST_CONFIG", None):
             return
         if subscription_id and tenant_id and app_id and len(pem_data):
@@ -176,19 +180,27 @@ class AzureConnector(BaseConnector):
                 vm_size = VirtualMachineSize(
                     name=it["name"],
                     number_of_cores=it["number_of_cores"],
-                    os_disk_size_in_mb=it["os_disk_size_in_mb"],
                     resource_disk_size_in_mb=it["resource_disk_size_in_mb"],
                     memory_in_mb=it["memory_in_mb"],
-                    max_data_disk_count=it["max_data_disk_count"],
                 )
-                vm_size.extra = {"price": 0, "description": "test vm size", "meter_id": ""}
+                vm_size.extra = {"price": it["price"], "description": "test vm size"}
                 node_sizes.append(vm_size)
             return node_sizes
+
+        if data := cache.data_cache("flavors", "azure").fetch_and_update([location]):
+            LOG.debug(f"Flavors are taken from cache (amount={len(data)})")
+            return data
 
         size_map: dict[str, VirtualMachineSize] = {}
         for size in self._compute_client.virtual_machine_sizes.list(location):
             size_map[size.name] = size
-        return self._add_prices(location, size_map)
+        result = self._add_prices(location, size_map)
+
+        changed, deleted = cache.data_cache("flavors", "azure").update([location], result)
+        if changed or deleted:
+            LOG.debug(f"Flavors cache updated (changed={changed}, deleted={deleted})")
+
+        return result
 
     def _add_prices(self, location: str, size_map: dict[str, VirtualMachineSize]) -> list[VirtualMachineSize]:
         results: list[VirtualMachineSize] = []
@@ -230,25 +242,31 @@ class AzureConnector(BaseConnector):
         return results
 
     def list_images(self, location: str, publisher: str, offer: str, skus: str) -> list[VirtualMachineImage]:
-        node_images: list[VirtualMachineImage] = []
+        images: list[VirtualMachineImage] = []
         if "images" in self._test_responses:
             for it in self._test_responses["images"]:
                 vm_image = VirtualMachineImage(
                     id=it["id"],
                     name=it["name"],
-                    location=it["location"],
-                    publisher=it["publisher"],
-                    offer=it["offer"],
-                    skus=it["skus"],
-                    version=it["version"],
+                    location=it["extra"]["location"],
+                    publisher=it["extra"]["publisher"],
+                    offer=it["extra"]["offer"],
+                    skus=it["extra"]["skus"],
+                    version=it["extra"]["version"],
                 )
                 vm_image.extra = {}
-                node_images.append(vm_image)
-            return node_images
+                images.append(vm_image)
+            return images
+
         LOG.debug(f"List images: location={location}, publisher={publisher}, offer={offer}, skus={skus}")
+        cache_key = [location, publisher, offer, skus] if skus else [location, publisher, offer]
+        if data := cache.data_cache("vmimages", "azure").fetch_and_update(cache_key):
+            LOG.debug(f"VM images are taken from cache (amount={len(data)})")
+            return data
+
         if skus:
             if azure_image := self._get_latest_sku_image(location, publisher, offer, skus):
-                node_images.append(azure_image)
+                images.append(azure_image)
         else:
             azure_skus = self._compute_client.virtual_machine_images.list_skus(
                 location=location,
@@ -257,8 +275,13 @@ class AzureConnector(BaseConnector):
             )
             for sku in azure_skus:
                 if azure_image := self._get_latest_sku_image(location, publisher, offer, sku.name):
-                    node_images.append(azure_image)
-        return node_images
+                    images.append(azure_image)
+
+        changed, deleted = cache.data_cache("vmimages", "azure").update(cache_key, images)
+        if changed or deleted:
+            LOG.debug(f"VM image cache updated (changed={changed}, deleted={deleted})")
+
+        return images
 
     def _get_latest_sku_image(self, location: str, publisher: str, offer: str, sku: str) -> VirtualMachineImage | None:
         max_date_image: VirtualMachineImage | None = None
@@ -370,13 +393,13 @@ class AzureConnector(BaseConnector):
         resource_group_name = self._get_resource_group_name(partition_name)
 
         if self._test_responses:
-            id = str(uuid.uuid4())
             new_part = {
-                "id": id,
+                "id": f"/subscriptions/{self._subscription_id}/resourceGroups/{partition_name}-resource-group",
                 "name": resource_group_name,
             }
             self._test_responses.setdefault("resource_groups", []).append(new_part)
-            return {"id": id, "name": resource_group_name}
+            LOG.debug(f"New partition added: {new_part}")
+            return new_part, resource_group_name
 
         resource_group_creation_result = self._resource_client.resource_groups.create_or_update(
             resource_group_name, {"location": location}
@@ -429,21 +452,20 @@ class AzureConnector(BaseConnector):
     ) -> VirtualMachineImage | None:
         if "images" in self._test_responses:
             for it in self._test_responses["images"]:
-                if (
-                    it["location"] == location
-                    and it["publisher"] == publisher
-                    and it["offer"] == offer
-                    and it["skus"] == sku
-                    and it["version"] == version
-                ):
+                img_id = (
+                    f"/Subscriptions/{self._subscription_id}/Providers/Microsoft.Compute/"
+                    f"Locations/{location}/Publishers/{publisher}/ArtifactTypes/VMImage/"
+                    f"Offers/{offer}/Skus/{sku}/Versions/{version}"
+                )
+                if img_id == it["id"]:
                     vm_image = VirtualMachineImage(
-                        id=it["id"],
+                        id=img_id,
                         name=it["name"],
-                        location=it["location"],
-                        publisher=it["publisher"],
-                        offer=it["offer"],
-                        skus=it["skus"],
-                        version=it["version"],
+                        location=location,
+                        publisher=publisher,
+                        offer=offer,
+                        skus=sku,
+                        version=version,
                     )
                     vm_image.extra = {}
                     return vm_image

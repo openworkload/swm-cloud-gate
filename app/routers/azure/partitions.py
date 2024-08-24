@@ -1,7 +1,7 @@
+import http
 import logging
 import traceback
 import typing
-import http
 
 from fastapi import APIRouter, Body, Header, HTTPException
 
@@ -84,7 +84,7 @@ async def list_partitions(
     try:
         partitions: typing.List[PartInfo] = []
         for resource_group_info in CONNECTOR.list_resource_groups():
-            partitions.append(convert_to_partition(resource_group_info, resource_group_info.name))
+            partitions.append(convert_to_partition(resource_group_info, resource_group_info["name"]))
         return {"partitions": partitions}
     except Exception as e:
         LOG.error(traceback.format_exception(e))

@@ -1,4 +1,4 @@
-PYTHON=python3
+PYTHON=python3.10
 RUNTEST=$(PYTHON) -m unittest -v -b
 VENV_BIN=.venv/bin
 ALLMODULES=$(patsubst %.py, %.py, $(wildcard test_*.py))
@@ -8,7 +8,7 @@ ALLMODULES=$(patsubst %.py, %.py, $(wildcard test_*.py))
 prepare-venv: .SHELLFLAGS := -euo pipefail -c
 prepare-venv: SHELL := bash
 prepare-venv:
-	python3 -m pip install 'virtualenv>=16.4.3'
+	$(PYTHON) -m pip install 'virtualenv>=16.4.3'
 	virtualenv --system-site-packages .venv
 	$(VENV_BIN)/pip install --ignore-installed --no-deps -r requirements.txt
 

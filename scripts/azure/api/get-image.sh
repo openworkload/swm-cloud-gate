@@ -22,13 +22,6 @@ HEADER4="appid: $(echo $CREDS | jq -r '.appid')"
 URL="https://${HOST}:${PORT}/azure/images/${IMAGE_ID}"
 BODY='{"pem_data": '${PEM_DATA}'}'
 
-echo $URL
-echo
-
-echo $HEADER2
-echo $HEADER3
-echo $HEADER4
-
 json=$(curl --request ${REQUEST}\
      --cacert ${CA}\
      --cert ${CERT}\

@@ -17,12 +17,12 @@ class TestAzureGate(asynctest.TestCase):
         "subscriptionid": "test",
         "tenantid": "test",
         "appid": "test",
-        "location": "test",
+        "extra": "location=test",
     }
 
     async def setUp(self):
         self.maxDiff = None
-        os.environ["SWM_TEST_CONFIG"] = "test/data/azure.json"
+        os.environ["SWM_TEST_CONFIG"] = "test/data/responses.json"
         self.proc = Process(
             target=uvicorn.run,
             args=("app.main:app",),
@@ -62,7 +62,7 @@ class TestAzureGate(asynctest.TestCase):
                         "id": "9348abe1-2a12-4ba7-9942-920a58fa887f",
                         "mem": 1073,
                         "name": "flavor1",
-                        "price": 0,
+                        "price": 3.0,
                         "storage": 12884,
                     },
                     {
@@ -70,7 +70,7 @@ class TestAzureGate(asynctest.TestCase):
                         "id": "5acfa3a8-991b-4e5e-822b-3fadbfc93f9a",
                         "mem": 2147,
                         "name": "flavor2",
-                        "price": 0,
+                        "price": 8.0,
                         "storage": 154618,
                     },
                 ]
@@ -95,7 +95,7 @@ class TestAzureGate(asynctest.TestCase):
                         "compute_instances_ips": [],
                         "created": None,
                         "description": None,
-                        "id": "rg1",
+                        "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg1-resource-group",
                         "master_private_ip": "",
                         "master_public_ip": "",
                         "name": "rg1",
@@ -106,7 +106,7 @@ class TestAzureGate(asynctest.TestCase):
                         "compute_instances_ips": [],
                         "created": None,
                         "description": None,
-                        "id": "rg2",
+                        "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg2-resource-group",
                         "master_private_ip": "",
                         "master_public_ip": "",
                         "name": "rg2",
@@ -123,10 +123,7 @@ class TestAzureGate(asynctest.TestCase):
             "subscriptionid": "test",
             "tenantid": "test",
             "appid": "test",
-            "location": "test",
-            "publisher": "test",
-            "offer": "test",
-            "skus": "test",
+            "extra": "location=test;publisher=test;offer=test;skus=test",
         }
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(
@@ -142,12 +139,14 @@ class TestAzureGate(asynctest.TestCase):
             {
                 "images": [
                     {
-                        "id": "i1",
+                        "id": ("/Subscriptions/foo/Providers/Microsoft.Compute/Locations/test"
+                               "/Publishers/test/ArtifactTypes/VMImage/Offers/test/Skus/test/Versions/1.2"),
                         "name": "image1",
                         "extra": {"location": "test", "tags": None},
                     },
                     {
-                        "id": "i2",
+                        "id": ("/Subscriptions/foo/Providers/Microsoft.Compute/Locations/test"
+                               "/Publishers/test/ArtifactTypes/VMImage/Offers/test/Skus/test/Versions/1.3"),
                         "name": "cirros",
                         "extra": {"location": "test", "tags": None},
                     },
@@ -158,7 +157,9 @@ class TestAzureGate(asynctest.TestCase):
     async def test_get_partition_existed(self):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.get(
-                url=f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo/resourceGroups/rg1",
+                url=(f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
+                     "/resourceGroups/rg1-resource-group"
+                     ),
                 json={"pem_data": "test"},
             ) as resp:
                 try:
@@ -171,7 +172,7 @@ class TestAzureGate(asynctest.TestCase):
                 "compute_instances_ips": [],
                 "created": None,
                 "description": None,
-                "id": "rg1",
+                "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg1-resource-group",
                 "master_private_ip": "",
                 "master_public_ip": "",
                 "name": "rg1",
@@ -183,14 +184,16 @@ class TestAzureGate(asynctest.TestCase):
     async def test_get_partition_absent(self):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.get(
-                url=f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo/resourceGroups/foo",
+                url=(f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
+                     "/resourceGroups/foo-resource-group"
+                     ),
                 json={"pem_data": "test"},
             ) as resp:
                 try:
                     data = await resp.json()
                 except aiohttp.client_exceptions.ContentTypeError:
                     data = await resp.text()
-        self.assertEqual(data, {"error": "Partition not found"})
+        self.assertEqual(data, {"detail": "Partition not found"})
 
     async def test_get_image_existed(self):
         img_id = (
@@ -198,7 +201,12 @@ class TestAzureGate(asynctest.TestCase):
             "Locations/test/Publishers/test/ArtifactTypes/VMImage/"
             "Offers/test/Skus/test/Versions/1.2"
         )
-        async with aiohttp.ClientSession(headers=self._default_headers) as session:
+        headers = {
+            "Accept": "application/json",
+            "tenantid": "test",
+            "appid": "test",
+        }
+        async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(
                 url=f"http://{self._hostname}:{self._port}/azure/images/{img_id}",
                 json={"pem_data": "test"},
@@ -210,7 +218,8 @@ class TestAzureGate(asynctest.TestCase):
         self.assertEqual(
             data,
             {
-                "id": "i1",
+                "id": ("/Subscriptions/foo/Providers/Microsoft.Compute/Locations"
+                       "/test/Publishers/test/ArtifactTypes/VMImage/Offers/test/Skus/test/Versions/1.2"),
                 "name": "image1",
                 "extra": {"location": "test", "tags": None},
             },
@@ -220,7 +229,7 @@ class TestAzureGate(asynctest.TestCase):
         img_id = (
             "/Subscriptions/foo/Providers/Microsoft.Compute/"
             "Locations/test/Publishers/test/ArtifactTypes/VMImage/"
-            "Offers/test/Skus/test/Versions/1.3"
+            "Offers/test/Skus/test/Versions/2.4"
         )
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.get(
@@ -231,8 +240,7 @@ class TestAzureGate(asynctest.TestCase):
                     data = await resp.json()
                 except aiohttp.client_exceptions.ContentTypeError:
                     data = await resp.text()
-        print(data)
-        self.assertEqual(data, {"error": "Image not found"})
+        self.assertEqual(data, {"detail": "Image not found"})
 
     async def test_delete_partition_existed(self):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
@@ -256,7 +264,7 @@ class TestAzureGate(asynctest.TestCase):
                     data = await resp.json()
                 except aiohttp.client_exceptions.ContentTypeError:
                     data = await resp.text()
-        self.assertEqual(data, {"result": None})
+        self.assertEqual(data, {"detail": "Cannot delete partition"})
 
     async def test_create_partition(self):
         headers = {
@@ -264,14 +272,15 @@ class TestAzureGate(asynctest.TestCase):
             "subscriptionid": "test",
             "tenantid": "test",
             "appid": "test",
-            "osversion": "ubuntu-22.04",
-            "containerimage": "swmregistry.azurecr.io/jupyter/datascience-notebook:hub-3.1.1",
             "containerregistryuser": "user",
             "containerregistrypass": "pass",
+            "osversion": "ubuntu-22.04",
+            "containerimage": "swmregistry.azurecr.io/jupyter/datascience-notebook:hub-3.1.1",
             "flavorname": "Standard_B2s",
             "username": "user",
             "count": "0",
             "jobid": "3579a076-9924-11ee-ba53-a3132f7ae2fb",
+            "partname": "part1",
             "runtime": "swm_source=ssh, ssh_pub_key=ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA7GA",
             "location": "eastus",
             "ports": "10001,10022",

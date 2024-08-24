@@ -1,10 +1,8 @@
+import http
 import logging
 import traceback
-import http
 
 from fastapi import APIRouter, Body, Header, HTTPException
-
-from app import cache
 
 from ..models import HttpBody, ImageInfo
 from .connector import AzureConnector
@@ -73,11 +71,6 @@ async def list_images(
         LOG.warning(msg)
         return {"error": msg}
 
-    cache_key = [location, publisher, offer, skus] if skus else [location, publisher, offer]
-    if data := cache.data_cache("vmimages").fetch_and_update(cache_key):
-        LOG.debug(f"VM images are taken from cache (amount={len(data)})")
-        return {"images": data}
-
     CONNECTOR.reinitialize(subscriptionid, tenantid, appid, body.pem_data)
     image_list: list[ImageInfo] = []
     try:
@@ -89,9 +82,4 @@ async def list_images(
             status_code=http.client.INTERNAL_SERVER_ERROR,
             detail="Cannot get images",
         )
-
-    changed, deleted = cache.data_cache("vmimages").update(cache_key, image_list)
-    if changed or deleted:
-        LOG.debug(f"VM image cache updated (changed={changed}, deleted={deleted})")
-
     return {"images": image_list}

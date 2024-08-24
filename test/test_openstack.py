@@ -15,7 +15,7 @@ class TestOpenstackGate(asynctest.TestCase):
 
     async def setUp(self):
         self.maxDiff = None
-        os.environ["SWM_TEST_CONFIG"] = "test/data/openstack.json"
+        os.environ["SWM_TEST_CONFIG"] = "test/data/responses.json"
         self.proc = Process(
             target=uvicorn.run,
             args=("app.main:app",),
@@ -89,7 +89,7 @@ class TestOpenstackGate(asynctest.TestCase):
                         "master_private_ip": "10.0.0.108",
                         "master_public_ip": "172.28.128.153",
                         "name": "stack1",
-                        "status": "CREATE_IN_PROGRESS",
+                        "status": "creating",
                         "updated": "2021-01-02T16:18:39",
                     },
                     {
@@ -100,7 +100,7 @@ class TestOpenstackGate(asynctest.TestCase):
                         "master_private_ip": "10.0.0.101",
                         "master_public_ip": "172.28.128.154",
                         "name": "stack2",
-                        "status": "CREATE_COMPLETE",
+                        "status": "succeeded",
                         "updated": "2021-01-02T11:18:39",
                     },
                 ]
@@ -151,7 +151,7 @@ class TestOpenstackGate(asynctest.TestCase):
                 "master_private_ip": "10.0.0.108",
                 "master_public_ip": "172.28.128.153",
                 "name": "stack1",
-                "status": "CREATE_IN_PROGRESS",
+                "status": "creating",
                 "updated": "2021-01-02T16:18:39",
             },
         )
