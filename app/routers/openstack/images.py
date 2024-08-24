@@ -30,11 +30,11 @@ async def get_image_info(id: str, username: str = EMPTY_HEADER, password: str = 
 
 @ROUTER.get("/openstack/images")
 async def list_images(username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
-    images_list: typing.List[ImageInfo] = []
+    image_list: typing.List[ImageInfo] = []
     try:
         CONNECTOR.reinitialize(username, password, "compute")
         for image in CONNECTOR.list_images():
-            images_list.append(convert_to_image(image))
+            image_list.append(convert_to_image(image))
     except Exception as e:
         LOG.error(traceback.format_exception(e))
         raise HTTPException(
