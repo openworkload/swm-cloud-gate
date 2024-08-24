@@ -20,10 +20,11 @@ class Cache:
     _cache_file_path: Path = Path()
     _data: list[tuple[datetime, list[str], list[BaseModel]]] = []
 
-    def __init__(self, data_kind: str, settings: config.Settings) -> None:
+    def __init__(self, data_kind: str, data_provider: str, settings: config.Settings) -> None:
         self._data_kind = data_kind
+        self._data_provider = data_provider
         self._settings = settings
-        self._data, self._cache_file_path = self._load_from_filesystem(data_kind, settings.cache_dir)
+        self._data, self._cache_file_path = self._load_from_filesystem()
         LOG.debug(f"Start {data_kind} cache: {self._cache_file_path}")
 
     def __del__(self) -> None:
@@ -75,12 +76,10 @@ class Cache:
 
         return changed, deleted
 
-    def _load_from_filesystem(
-        self, data_kind: str, cache_dir: str
-    ) -> tuple[list[tuple[datetime, list[str], list[BaseModel]]], Path]:
-        LOG.debug(f"Load cache data from directory: {cache_dir}")
+    def _load_from_filesystem(self) -> tuple[list[tuple[datetime, list[str], list[BaseModel]]], Path]:
+        LOG.debug(f"Load cache data from directory: {self._settings.cache_dir}")
         data: list[tuple[datetime, list[str], list[BaseModel]]] = []
-        cache_file_path = Path(f"{cache_dir}/cloud-gate-{data_kind}.dat")
+        cache_file_path = Path(f"{self._settings.cache_dir}/cloud-gate-{self._data_provider}-{self._data_kind}.dat")
         if cache_file_path.exists():
             data = self._read(cache_file_path)
         else:
@@ -105,9 +104,9 @@ class Cache:
 
 
 @lru_cache(maxsize=64)
-def data_cache(data_kind: str, cache_dir: str = "") -> Cache:
+def data_cache(data_kind: str, data_provider: str, cache_dir: str = "") -> Cache:
     settings = config.get_settings(cache_dir) if cache_dir else config.get_settings()
-    return Cache(data_kind, settings)
+    return Cache(data_kind, data_provider, settings)
 
 
 def cleanup():
