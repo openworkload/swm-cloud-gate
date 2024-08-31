@@ -427,11 +427,16 @@ class AzureConnector(BaseConnector):
             cloud_init_script,
             ports,
         )
-        deployment_async_operation = self._resource_client.deployments.begin_create_or_update(
-            resource_group_name,
-            deployment_name,
-            deployment_properties,
-        )
+        try:
+            deployment_async_operation = self._resource_client.deployments.begin_create_or_update(
+                resource_group_name,
+                deployment_name,
+                deployment_properties,
+            )
+        except azure.core.exceptions.HttpResponseError as e:
+            LOG.error(e)
+            raise e
+
 
         LOG.info(f"Deploying resource group {resource_group_name}, deployment: {deployment_name}")
         return deployment_async_operation.result(), resource_group_name

@@ -37,9 +37,9 @@ setup_swm_worker() {
             fi
         done
 
-        source /opt/swm/0.2.0/scripts/swm.env
+        source /opt/swm/*/scripts/swm.env
 
-        ${SWM_ROOT}/${SWM_VERSION}/scripts/setup.linux -p ${SWM_ROOT} -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup-config.linux
+        ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py -p ${SWM_ROOT} -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup.config
 
     elif [[ "{{ swm_source }}" == "http://*.tar.gz" ]]; then
         TMP_DIR=$(mktemp -d -t swm-worker-XXXXX)
