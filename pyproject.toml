@@ -45,9 +45,8 @@ dependencies = [
     "azure-mgmt-resource",
     "azure-mgmt-commerce",
     "azure-mgmt-compute >= 32.0.0",
-    "azure-storage-blob",
 ]
-license = {text = "BSD License"}
+license = {text = "BSD 3-Clause License"}
 dynamic = ["version", "readme"]
 
 [project.urls]
@@ -56,7 +55,7 @@ Documentation = "https://openworkload.org"
 Repository = "https://github.com/openworkload/swm-cloud-gate"
 Tests = "https://github.com/openworkload/swm-cloud-gate/tree/master/test"
 Issues = "https://github.com/openworkload/swm-cloud-gate/issues"
-Distribution = "https://pypi.org/project/swm-cloud-gate"
+Distribution = "https://pypi.org/project/swmcloudgate"
 
 [project.optional-dependencies]
 build = [
@@ -79,9 +78,6 @@ enabled = true
 template = "{tag}"
 dev_template = "{tag}"
 dirty_template = "{tag}"
-
-[tool.setuptools]
-include-package-data = true
 
 [tool.setuptools.dynamic]
 readme = {file = ["README.md"], content-type = "text/markdown"}

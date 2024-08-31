@@ -2,7 +2,6 @@
 aiohttp
 asyncio
 asynctest
-#attrs>=19.0.0
 autoflake
 bandit
 black
@@ -18,7 +17,6 @@ python-dotenv
 jinja2
 ruff
 uvicorn
-#typed-ast==1.5.4
 twine
 wheel
 
@@ -35,4 +33,3 @@ azure-identity
 azure-mgmt-resource
 azure-mgmt-commerce
 azure-mgmt-compute >= 32.0.0
-azure-storage-blob

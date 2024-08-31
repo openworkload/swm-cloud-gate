@@ -20,7 +20,6 @@ asynctest==0.13.0
     # via -r requirements.in
 attrs==23.2.0
     # via
-    #   -r requirements.in
     #   aiohttp
     #   flake8-bugbear
 autoflake==2.2.1
@@ -35,7 +34,6 @@ azure-core==1.29.7
     #   -r requirements.in
     #   azure-identity
     #   azure-mgmt-core
-    #   azure-storage-blob
     #   msrest
 azure-identity==1.15.0
     # via -r requirements.in
@@ -49,8 +47,6 @@ azure-mgmt-core==1.4.0
     #   azure-mgmt-compute
     #   azure-mgmt-resource
 azure-mgmt-resource==23.0.1
-    # via -r requirements.in
-azure-storage-blob==12.19.0
     # via -r requirements.in
 backports-tarfile==1.2.0
     # via jaraco-context
@@ -76,7 +72,6 @@ click==8.1.7
 cryptography==42.0.0
     # via
     #   azure-identity
-    #   azure-storage-blob
     #   msal
     #   pyjwt
     #   secretstorage
@@ -114,7 +109,6 @@ isodate==0.6.1
     # via
     #   azure-mgmt-compute
     #   azure-mgmt-resource
-    #   azure-storage-blob
     #   msrest
 isort==5.13.2
     # via -r requirements.in
@@ -254,13 +248,10 @@ tomli==2.0.1
     #   pyproject-hooks
 twine==5.1.1
     # via -r requirements.in
-typed-ast==1.5.4
-    # via -r requirements.in
 typing-extensions==4.9.0
     # via
     #   azure-core
     #   azure-mgmt-compute
-    #   azure-storage-blob
     #   black
     #   mypy
     #   pydantic
