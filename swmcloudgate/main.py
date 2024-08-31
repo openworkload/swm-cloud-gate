@@ -2,12 +2,12 @@ import logging
 
 from fastapi import FastAPI
 
+from .routers.azure import sizes as azure_sizes
 from .routers.azure import images as azure_images
 from .routers.azure import partitions as azure_partitions
-from .routers.azure import sizes as azure_sizes
+from .routers.openstack import sizes as openstack_sizes
 from .routers.openstack import images as openstack_images
 from .routers.openstack import partitions as openstack_partitions
-from .routers.openstack import sizes as openstack_sizes
 
 LOGGER = logging.getLogger("swm")
 LOGGER.setLevel(logging.DEBUG)

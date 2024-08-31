@@ -1,7 +1,7 @@
 import logging
 import traceback
 
-from fastapi import APIRouter, Body, Header
+from fastapi import Body, Header, APIRouter
 
 from ..models import HttpBody, ImageInfo
 from .connector import AzureConnector

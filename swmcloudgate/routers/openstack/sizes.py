@@ -1,6 +1,6 @@
 import typing
 
-from fastapi import APIRouter, Header
+from fastapi import Header, APIRouter
 
 from ..models import ImageInfo
 from .connector import OpenStackConnector

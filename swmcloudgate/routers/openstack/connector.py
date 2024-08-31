@@ -1,24 +1,24 @@
-import datetime
 import http
-import logging
-import traceback
-import typing
 import uuid
+import typing
+import logging
+import datetime
+import traceback
 
+import yaml
 import jinja2
 import libcloud.security
-import yaml
-from libcloud.common.openstack import OpenStackResponse
 from libcloud.compute.base import NodeImage
-from libcloud.compute.drivers.openstack import OpenStackNodeSize
-from libcloud.compute.providers import get_driver
 from libcloud.compute.types import Provider
+from libcloud.common.openstack import OpenStackResponse
+from libcloud.compute.providers import get_driver
+from libcloud.compute.drivers.openstack import OpenStackNodeSize
 
 from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
-STACK_TEMLPATE_FILE = "app/routers/openstack/templates/heat_stack.yaml"
-CLOUD_INIT_SCRIPT_FILE = "app/routers/openstack/templates/cloud-init.sh"
+STACK_TEMLPATE_FILE = "swmcloudgate/routers/openstack/templates/heat_stack.yaml"
+CLOUD_INIT_SCRIPT_FILE = "swmcloudgate/routers/openstack/templates/cloud-init.sh"
 SERVICE_NAMES = {"compute": "nova", "orchestration": "heat", "rating": "cloudkitty"}
 
 

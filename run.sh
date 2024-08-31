@@ -1,4 +1,4 @@
 #!/bin/bash
 
 source .venv/bin/activate
-./run.py
+./start-cloud-gate.py

@@ -1,8 +1,8 @@
 import http
-import logging
 import typing
+import logging
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import Header, APIRouter, HTTPException
 
 from ..models import PartInfo
 from .connector import OpenStackConnector

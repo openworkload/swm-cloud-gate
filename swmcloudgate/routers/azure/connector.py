@@ -1,27 +1,26 @@
-import base64
-import json
-import logging
 import os
+import json
+import base64
 import typing
-import uuid
+import logging
 
 import jinja2
-from azure.core.exceptions import ResourceNotFoundError
 from azure.identity import CertificateCredential
-from azure.mgmt.commerce import UsageManagementClient
 from azure.mgmt.compute import ComputeManagementClient
-from azure.mgmt.compute.models import VirtualMachineImage, VirtualMachineSize
-from azure.mgmt.resource import ResourceManagementClient, SubscriptionClient
-from azure.mgmt.resource.resources.models import DeploymentExtended, DeploymentMode
+from azure.mgmt.commerce import UsageManagementClient
+from azure.mgmt.resource import SubscriptionClient, ResourceManagementClient
+from azure.core.exceptions import ResourceNotFoundError
+from azure.mgmt.compute.models import VirtualMachineSize, VirtualMachineImage
+from azure.mgmt.resource.resources.models import DeploymentMode, DeploymentExtended
 
-from app import cache
+from swmcloudgate import cache
 
 from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
-TEMLPATE_FILE = "app/routers/azure/templates/partition.json"
-CLOUD_INIT_SCRIPT_FILE = "app/routers/azure/templates/cloud-init.sh"
-CLOUD_INIT_YAML = "app/routers/azure/templates/cloud-init.yaml"
+TEMLPATE_FILE = "swmcloudgate/routers/azure/templates/partition.json"
+CLOUD_INIT_SCRIPT_FILE = "swmcloudgate/routers/azure/templates/cloud-init.sh"
+CLOUD_INIT_YAML = "swmcloudgate/routers/azure/templates/cloud-init.yaml"
 
 
 class AzureConnector(BaseConnector):

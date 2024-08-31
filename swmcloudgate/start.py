@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
+#
+# This module is used to spawn the gate in container.
+# For development purposes use run.sh located outside the package directory.
+#
 
 import os
-import socket
 import ssl
+import socket
 
 import uvicorn
 
 
-def main():
+def start():
     spool = "/opt/swm/spool/secure"
     uvicorn.run(
         "swmcloudgate.main:app",
-        log_config="logging.yaml",
         host=socket.gethostname(),
         port=8444,
         reload=False,
@@ -27,4 +30,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    start()

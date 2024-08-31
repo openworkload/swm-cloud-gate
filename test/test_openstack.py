@@ -1,11 +1,11 @@
-import asyncio
 import os
 import socket
+import asyncio
 from multiprocessing import Process
 
 import aiohttp
-import asynctest
 import uvicorn
+import asynctest
 
 
 class TestOpenstackGate(asynctest.TestCase):
@@ -18,7 +18,7 @@ class TestOpenstackGate(asynctest.TestCase):
         os.environ["SWM_TEST_CONFIG"] = "test/data/responses.json"
         self.proc = Process(
             target=uvicorn.run,
-            args=("app.main:app",),
+            args=("swmcloudgate.main:app",),
             kwargs={
                 "host": self._hostname,
                 "port": self._port,

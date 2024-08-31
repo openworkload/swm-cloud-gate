@@ -1,11 +1,11 @@
-import asyncio
 import os
 import socket
+import asyncio
 from multiprocessing import Process
 
 import aiohttp
-import asynctest
 import uvicorn
+import asynctest
 
 
 class TestAzureGate(asynctest.TestCase):
@@ -25,7 +25,7 @@ class TestAzureGate(asynctest.TestCase):
         os.environ["SWM_TEST_CONFIG"] = "test/data/responses.json"
         self.proc = Process(
             target=uvicorn.run,
-            args=("app.main:app",),
+            args=("swmcloudgate.main:app",),
             kwargs={
                 "host": self._hostname,
                 "port": self._port,
@@ -139,14 +139,18 @@ class TestAzureGate(asynctest.TestCase):
             {
                 "images": [
                     {
-                        "id": ("/Subscriptions/foo/Providers/Microsoft.Compute/Locations/test"
-                               "/Publishers/test/ArtifactTypes/VMImage/Offers/test/Skus/test/Versions/1.2"),
+                        "id": (
+                            "/Subscriptions/foo/Providers/Microsoft.Compute/Locations/test"
+                            "/Publishers/test/ArtifactTypes/VMImage/Offers/test/Skus/test/Versions/1.2"
+                        ),
                         "name": "image1",
                         "extra": {"location": "test", "tags": None},
                     },
                     {
-                        "id": ("/Subscriptions/foo/Providers/Microsoft.Compute/Locations/test"
-                               "/Publishers/test/ArtifactTypes/VMImage/Offers/test/Skus/test/Versions/1.3"),
+                        "id": (
+                            "/Subscriptions/foo/Providers/Microsoft.Compute/Locations/test"
+                            "/Publishers/test/ArtifactTypes/VMImage/Offers/test/Skus/test/Versions/1.3"
+                        ),
                         "name": "cirros",
                         "extra": {"location": "test", "tags": None},
                     },
@@ -157,9 +161,10 @@ class TestAzureGate(asynctest.TestCase):
     async def test_get_partition_existed(self):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.get(
-                url=(f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
-                     "/resourceGroups/rg1-resource-group"
-                     ),
+                url=(
+                    f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
+                    "/resourceGroups/rg1-resource-group"
+                ),
                 json={"pem_data": "test"},
             ) as resp:
                 try:
@@ -184,9 +189,10 @@ class TestAzureGate(asynctest.TestCase):
     async def test_get_partition_absent(self):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.get(
-                url=(f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
-                     "/resourceGroups/foo-resource-group"
-                     ),
+                url=(
+                    f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
+                    "/resourceGroups/foo-resource-group"
+                ),
                 json={"pem_data": "test"},
             ) as resp:
                 try:
@@ -218,8 +224,10 @@ class TestAzureGate(asynctest.TestCase):
         self.assertEqual(
             data,
             {
-                "id": ("/Subscriptions/foo/Providers/Microsoft.Compute/Locations"
-                       "/test/Publishers/test/ArtifactTypes/VMImage/Offers/test/Skus/test/Versions/1.2"),
+                "id": (
+                    "/Subscriptions/foo/Providers/Microsoft.Compute/Locations"
+                    "/test/Publishers/test/ArtifactTypes/VMImage/Offers/test/Skus/test/Versions/1.2"
+                ),
                 "name": "image1",
                 "extra": {"location": "test", "tags": None},
             },

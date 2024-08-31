@@ -1,9 +1,9 @@
 import http
+import typing
 import logging
 import traceback
-import typing
 
-from fastapi import APIRouter, Body, Header, HTTPException
+from fastapi import Body, Header, APIRouter, HTTPException
 
 from ..models import HttpBody, PartInfo
 from .connector import AzureConnector

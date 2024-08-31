@@ -1,12 +1,12 @@
+import uuid
+import typing
 import hashlib
 import logging
-import typing
-import uuid
 
-from azure.mgmt.compute.models import VirtualMachineImage, VirtualMachineSize
+from azure.mgmt.compute.models import VirtualMachineSize, VirtualMachineImage
 from azure.mgmt.resource.resources.models import DeploymentExtended
 
-from ..models import Flavor, ImageInfo, PartInfo
+from ..models import Flavor, PartInfo, ImageInfo
 
 LOG = logging.getLogger("swm")
 

@@ -1,8 +1,9 @@
 import http
 import typing
 import logging
+import traceback
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import Header, APIRouter, HTTPException
 
 from ..models import ImageInfo
 from .connector import OpenStackConnector

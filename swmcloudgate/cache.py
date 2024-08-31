@@ -1,13 +1,13 @@
 import atexit
-import logging
 import pickle  # nosec B403
+import logging
+from pathlib import Path
 from datetime import datetime, timedelta
 from functools import lru_cache
-from pathlib import Path
 
 from pydantic import BaseModel
 
-from app import config
+from swmcloudgate import config
 
 LOG = logging.getLogger("swm")
 

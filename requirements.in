@@ -2,7 +2,7 @@
 aiohttp
 asyncio
 asynctest
-attrs>=19.0.0
+#attrs>=19.0.0
 autoflake
 bandit
 black
@@ -18,7 +18,10 @@ python-dotenv
 jinja2
 ruff
 uvicorn
-typed-ast==1.5.4
+#typed-ast==1.5.4
+twine
+wheel
+
 
 # Fix unsatisfied dependency on dataclasses 0.8 issue
 dataclasses==0.6

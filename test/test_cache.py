@@ -1,11 +1,11 @@
 import pickle
 import unittest
-from datetime import datetime, timedelta
 from pathlib import Path
+from datetime import datetime, timedelta
 from tempfile import TemporaryDirectory
 
-from app import cache
-from app.routers.models import BaseModel
+from swmcloudgate import cache
+from swmcloudgate.routers.models import BaseModel
 
 
 class TestCache(unittest.TestCase):

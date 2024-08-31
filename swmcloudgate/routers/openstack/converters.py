@@ -1,8 +1,8 @@
 import typing
 
-from libcloud.compute.base import NodeImage, NodeSize
+from libcloud.compute.base import NodeSize, NodeImage
 
-from ..models import Flavor, ImageInfo, PartInfo
+from ..models import Flavor, PartInfo, ImageInfo
 
 
 def convert_to_partition(stack: typing.Dict[str, typing.Any]) -> PartInfo:

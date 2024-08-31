@@ -1,3 +1,91 @@
+[build-system]
+requires = [
+    "setuptools~=70.0.0",
+    "setuptools-git-versioning>=2.0,<3",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swmcloudgate"
+description = "Sky Port gate service that provides cloud integration"
+authors = [
+    {name = "Taras Shapovalov", email = "taras@iclouds.net"},
+]
+keywords = [
+    "hpc",
+    "high performance computing",
+    "cloud",
+    "cloud computing",
+    "open workload",
+    "sky port",
+]
+classifiers = [
+    "Environment :: Console",
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3 :: Only",
+]
+requires-python = "~=3.10"
+dependencies = [
+    "aiohttp",
+    "asyncio",
+    "asynctest",
+    "fastapi==0.63.0",
+    "pyyaml",
+    "python-dotenv",
+    "jinja2",
+    "uvicorn",
+    "dataclasses==0.6",
+    "azure-core",
+    "azure-identity",
+    "azure-mgmt-resource",
+    "azure-mgmt-commerce",
+    "azure-mgmt-compute >= 32.0.0",
+    "azure-storage-blob",
+]
+license = {text = "BSD License"}
+dynamic = ["version", "readme"]
+
+[project.urls]
+Homepage = "https://openworkload.org"
+Documentation = "https://openworkload.org"
+Repository = "https://github.com/openworkload/swm-cloud-gate"
+Tests = "https://github.com/openworkload/swm-cloud-gate/tree/master/test"
+Issues = "https://github.com/openworkload/swm-cloud-gate/issues"
+Distribution = "https://pypi.org/project/swm-cloud-gate"
+
+[project.optional-dependencies]
+build = [
+    "build==1.2.1"
+]
+publish = [
+    "twine==5.1.1"
+]
+test = [
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+where = ["./"]
+include = ["swmcloudgate*"]
+exclude = ["swmcloudgate.egg-info", "test"]
+
+[tool.setuptools-git-versioning]
+enabled = true
+template = "{tag}"
+dev_template = "{tag}"
+dirty_template = "{tag}"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+readme = {file = ["README.md"], content-type = "text/markdown"}
+
 [tool.black]
 line-length = 120
 target_version = ['py310']
@@ -7,6 +95,9 @@ exclude = '''
     | \.git
     | \.venv
     | \.mypy_cache
+    | \dist
+    | \build
+    | \swmcloudgate.egg-info
   )/
 )
 '''
@@ -14,38 +105,28 @@ exclude = '''
 [tool.ruff]
 line-length = 120
 exclude = [
-    "swmclient/generated",
-    ".bzr",
-    ".direnv",
-    ".eggs",
     ".git",
-    ".hg",
     ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
     ".ruff_cache",
-    ".svn",
-    ".tox",
     ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
     "build",
     "dist",
-    "node_modules",
-    "venv",
+    "swmcloudgate.egg-info",
 ]
 
 [tool.isort]
 line_length = 120
 profile = "black"
-skip = ".venv"
+skip_glob = [".venv/*", ".github/workflows/*"]
+length_sort = true
 
 [tool.mypy]
+platform = "linux"
 python_version = 3.10
 strict = true
 follow_imports = "silent"
+show_error_context = true
+show_column_numbers = true
 
 [[tool.mypy.overrides]]
 module = "test.*"
@@ -54,4 +135,4 @@ allow_incomplete_defs = true
 allow_untyped_calls = true
 
 [tool.bandit]
-skips = []
+exclude_dirs = [".git", "build", "dist", ".venv", "tests/*"]

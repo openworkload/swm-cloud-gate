@@ -7,6 +7,6 @@ PID_FILE=$PID_DIR/pid
 source .venv/bin/activate
 export SWM_TEST_CONFIG=test/data/responses.json
 trap "rm -f $PID_FILE" EXIT
-./run.py &
+./start-cloud-gate.py &
 echo $! > $PID_FILE
 wait $!

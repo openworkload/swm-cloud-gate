@@ -1,7 +1,7 @@
-import json
-import logging
 import os
+import json
 import typing
+import logging
 
 LOG = logging.getLogger("swm")
 

@@ -14,17 +14,33 @@ prepare-venv:
 
 .PHONY: check
 check:
-	$(VENV_BIN)/flake8 app test
-	$(VENV_BIN)/black --check --diff --exclude .venv app test
-	$(VENV_BIN)/ruff app test
-	$(VENV_BIN)/bandit -r app -c "pyproject.toml" --silent
+	$(VENV_BIN)/flake8 swmcloudgate test
+	$(VENV_BIN)/black --check --diff --exclude .venv swmcloudgate test
+	$(VENV_BIN)/ruff swmcloudgate test
+	$(VENV_BIN)/bandit -r swmcloudgate -c "pyproject.toml" --silent
 
 .PHONY: format
 format:
 	. $(VENV_BIN)/activate
-	$(VENV_BIN)/autoflake -i -r --ignore-init-module-imports app test
-	$(VENV_BIN)/isort --gitignore app test
-	$(VENV_BIN)/black --exclude .venv app test
+	$(VENV_BIN)/autoflake -i -r --ignore-init-module-imports swmcloudgate test
+	$(VENV_BIN)/isort --gitignore swmcloudgate test
+	$(VENV_BIN)/black --exclude .venv swmcloudgate test
+
+.PHONY: package
+package:
+	. .venv/bin/activate
+	$(PYTHON) -m build
+
+.PHONY: upload
+upload:
+	. .venv/bin/activate
+	$(PYTHON) -m twine upload --verbose --config-file .pypirc dist/*
+
+.PHONY: clean
+clean:
+	rm -fr ./dist
+	rm -fr ./swmcloudgate.egg-info
+	rm -fr ./build
 
 .PHONY: test
 test:
