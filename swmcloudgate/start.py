@@ -17,7 +17,7 @@ def start():
     os.chdir(os.path.dirname(my_dir))
     uvicorn.run(
         "swmcloudgate.main:app",
-        log_config=f"{my_dir}/swmcloudgate/logging.yaml",
+        log_config=f"{my_dir}/logging.yaml",
         host=socket.gethostname(),
         port=8444,
         reload=False,

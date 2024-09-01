@@ -75,6 +75,7 @@ include = ["swmcloudgate*"]
 exclude = ["swmcloudgate.egg-info", "test"]
 
 [tool.setuptools.package-data]
+"swmcloudgate" = ["logging.yaml"]
 "swmcloudgate.routers.azure.templates" = ["*"]
 "swmcloudgate.routers.openstack.templates" = ["*"]
 
