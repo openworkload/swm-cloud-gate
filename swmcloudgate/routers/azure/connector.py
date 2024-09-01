@@ -193,6 +193,7 @@ class AzureConnector(BaseConnector):
         size_map: dict[str, VirtualMachineSize] = {}
         for size in self._compute_client.virtual_machine_sizes.list(location):
             size_map[size.name] = size
+        LOG.debug(f"Retrieved {len(size_map)} flavors from Azure")
         result = self._add_prices(location, size_map)
 
         changed, deleted = cache.data_cache("flavors", "azure").update([location], result)

@@ -40,6 +40,7 @@ dependencies = [
     "jinja2",
     "uvicorn",
     "dataclasses==0.6",
+    "apache-libcloud>=3.6.1",
     "azure-core",
     "azure-identity",
     "azure-mgmt-resource",
@@ -72,6 +73,10 @@ test = [
 where = ["./"]
 include = ["swmcloudgate*"]
 exclude = ["swmcloudgate.egg-info", "test"]
+
+[tool.setuptools.package-data]
+"swmcloudgate.routers.azure.templates" = ["*"]
+"swmcloudgate.routers.openstack.templates" = ["*"]
 
 [tool.setuptools-git-versioning]
 enabled = true

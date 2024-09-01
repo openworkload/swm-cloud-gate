@@ -9,13 +9,14 @@ import uvicorn
 
 def main():
     spool = "/opt/swm/spool/secure"
+    my_dir = os.path.dirname(os.path.abspath(__file__))
     uvicorn.run(
         "swmcloudgate.main:app",
-        log_config="logging.yaml",
+        log_config=f"{my_dir}/swmcloudgate/logging.yaml",
         host=socket.gethostname(),
         port=8444,
         reload=False,
-        workers=2,
+        workers=8,
         limit_concurrency=32,
         limit_max_requests=1000,
         timeout_keep_alive=60,
