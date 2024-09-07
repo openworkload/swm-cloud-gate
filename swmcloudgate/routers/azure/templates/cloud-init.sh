@@ -37,6 +37,7 @@ setup_swm_worker() {
             fi
         done
 
+        mkdir /opt/swm/spool
         source /opt/swm/*/scripts/swm.env
 
         ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py -p ${SWM_ROOT} -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup.config

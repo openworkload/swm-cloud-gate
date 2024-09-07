@@ -29,8 +29,7 @@ class Cache:
 
     def __del__(self) -> None:
         LOG.debug(f"Stop {self._data_kind} cache")
-        if self._data:
-            self._write(self._cache_file_path, self._data)
+        self._write(self._cache_file_path, self._data)
 
     @property
     def expire(self) -> int:
@@ -74,6 +73,8 @@ class Cache:
             self._data.append((now, key, value))
             changed += 1
 
+        self._write(self._cache_file_path, self._data)
+
         return changed, deleted
 
     def _load_from_filesystem(self) -> tuple[list[tuple[datetime, list[str], list[BaseModel]]], Path]:
@@ -99,8 +100,12 @@ class Cache:
         return []
 
     def _write(self, file_path: Path, data: list[tuple[datetime, list[str], list[BaseModel]]]) -> None:
-        with open(file_path, "wb") as file:
-            pickle.dump(data, file)  # nosec B301
+        if data:
+            LOG.debug(f"Dump cache {self._data_kind} data into {file_path}")
+            with open(file_path, "wb") as file:
+                pickle.dump(data, file)  # nosec B301
+        else:
+            LOG.debug(f"Nothing to dump for {self._data_kind} data")
 
 
 @lru_cache(maxsize=64)

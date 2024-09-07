@@ -3,9 +3,9 @@
 source $(dirname "$0")/helpers.sh
 
 CREDS=$(read_credentials azure)
-CERT=/opt/swm/spool/secure/node/cert.pem
-KEY=/opt/swm/spool/secure/node/key.pem
-CA=/opt/swm/spool/secure/cluster/ca-chain-cert.pem
+CERT=$HOME/.swm/spool/secure/node/cert.pem
+KEY=$HOME/.swm/spool/secure/node/key.pem
+CA=$HOME/.swm/spool/secure/cluster/ca-chain-cert.pem
 PEM_DATA=$(make_pem_data $CERT $KEY)
 
 PORT=8444

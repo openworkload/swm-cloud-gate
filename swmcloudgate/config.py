@@ -7,7 +7,7 @@ USER_DIR = os.path.expanduser("~")
 
 
 class Settings(BaseSettings):
-    cache_expire: int = 3600
+    cache_expire: int = 14 * 24 * 3600
     cache_dir: str
 
     class Config:

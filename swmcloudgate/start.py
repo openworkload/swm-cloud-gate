@@ -15,10 +15,11 @@ def start():
     spool = "/opt/swm/spool/secure"
     my_dir = os.path.dirname(os.path.abspath(__file__))
     os.chdir(os.path.dirname(my_dir))
+    hostname = socket.gethostname().split(".")[0]
     uvicorn.run(
         "swmcloudgate.main:app",
         log_config=f"{my_dir}/logging.yaml",
-        host=socket.gethostname(),
+        host=hostname,
         port=8444,
         reload=False,
         workers=8,

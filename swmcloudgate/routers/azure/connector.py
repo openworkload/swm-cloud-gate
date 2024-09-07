@@ -9,7 +9,7 @@ from azure.identity import CertificateCredential
 from azure.mgmt.compute import ComputeManagementClient
 from azure.mgmt.commerce import UsageManagementClient
 from azure.mgmt.resource import SubscriptionClient, ResourceManagementClient
-from azure.core.exceptions import ResourceNotFoundError
+from azure.core.exceptions import HttpResponseError, ResourceNotFoundError
 from azure.mgmt.compute.models import VirtualMachineSize, VirtualMachineImage
 from azure.mgmt.resource.resources.models import DeploymentMode, DeploymentExtended
 
@@ -239,6 +239,7 @@ class AzureConnector(BaseConnector):
                         results.append(vm_size)
                     else:
                         duplication_counter += 1
+        LOG.debug(f"Number of final flavors: {len(results)}")
         return results
 
     def list_images(self, location: str, publisher: str, offer: str, skus: str) -> list[VirtualMachineImage]:
@@ -434,10 +435,9 @@ class AzureConnector(BaseConnector):
                 deployment_name,
                 deployment_properties,
             )
-        except azure.core.exceptions.HttpResponseError as e:
+        except HttpResponseError as e:
             LOG.error(e)
             raise e
-
 
         LOG.info(f"Deploying resource group {resource_group_name}, deployment: {deployment_name}")
         return deployment_async_operation.result(), resource_group_name
@@ -484,4 +484,5 @@ class AzureConnector(BaseConnector):
         ):
             azure_image.extra: dict[str, str] = {"sku": sku, "publisher": publisher, "offer": offer, "version": version}
             return azure_image
+
         return None
