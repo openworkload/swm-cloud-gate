@@ -225,10 +225,15 @@ class AzureConnector(BaseConnector):
             if meter.meter_name.endswith("Low Priority"):
                 continue
             parts = meter.meter_region.split(" ")
-            if len(parts) != 2:
+            if len(parts) == 1:
+                location_from_meter = parts[0]
+            elif len(parts) >= 2:
+                location_from_meter = parts[1] + parts[0]
+            else:
                 continue
-            location_from_meter = (parts[1] + parts[0]).lower()
-            if location != location_from_meter:
+            if len(parts) == 3:
+                location_from_meter += parts[2]
+            if location != location_from_meter.lower():
                 continue
             for meter_name in meter.meter_name.split("/"):
                 size_name = f"Standard_{meter_name.replace(' ', '_')}"
