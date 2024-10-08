@@ -29,7 +29,7 @@ class TestAzureGate(asynctest.TestCase):
             kwargs={
                 "host": self._hostname,
                 "port": self._port,
-                "log_config": "logging.yaml",
+                "log_config": "swmcloudgate/logging.yaml",
                 "reload": False,
                 "timeout_keep_alive": 60,
             },
