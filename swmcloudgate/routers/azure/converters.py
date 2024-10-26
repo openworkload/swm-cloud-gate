@@ -31,6 +31,7 @@ def convert_to_flavor(data: VirtualMachineSize) -> Flavor:
         id=str(image_id),
         name=data.name,
         cpus=data.number_of_cores,
+        gpus=data.extra.get("gpus", 0),
         mem=data.memory_in_mb,
         storage=data.resource_disk_size_in_mb,
         price=data.extra.get("price", 0.0),

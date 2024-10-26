@@ -25,6 +25,7 @@ class Flavor(BaseModel):
     id: str
     name: str
     cpus: int
+    gpus: int
     mem: int
     storage: int
     price: float

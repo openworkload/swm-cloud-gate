@@ -182,7 +182,7 @@ class AzureConnector(BaseConnector):
                     resource_disk_size_in_mb=it["resource_disk_size_in_mb"],
                     memory_in_mb=it["memory_in_mb"],
                 )
-                vm_size.extra = {"price": it["price"], "description": "test vm size"}
+                vm_size.extra = {"gpus": 0, "price": it["price"], "description": "test vm size"}
                 node_sizes.append(vm_size)
             return node_sizes
 
@@ -192,8 +192,10 @@ class AzureConnector(BaseConnector):
 
         size_map: dict[str, VirtualMachineSize] = {}
         for size in self._compute_client.virtual_machine_sizes.list(location):
+            size.extra: dict[str, str] = {}
             size_map[size.name] = size
         LOG.debug(f"Retrieved {len(size_map)} flavors from Azure")
+        self._add_gpus(location, size_map)
         result = self._add_prices(location, size_map)
 
         changed, deleted = cache.data_cache("flavors", "azure").update([location], result)
@@ -201,6 +203,20 @@ class AzureConnector(BaseConnector):
             LOG.debug(f"Flavors cache updated (changed={changed}, deleted={deleted})")
 
         return result
+
+    def _add_gpus(self, location: str, size_map: dict[str, VirtualMachineSize]) -> None:
+        LOG.debug(f"Retriev GPU flavors information from Azure")
+        skus = self._compute_client.resource_skus.list()
+        for sku in skus:
+            if sku.resource_type.lower() != "virtualmachines":
+                continue
+            if sku.name not in size_map.keys():
+                continue
+            location_from_sku = sku.locations[0] if sku.locations else "Unknown"
+            if location != location_from_sku:
+                continue
+            if gpu_count := next((int(c.value) for c in sku.capabilities if c.name.lower() == "gpus"), 0):
+                size_map[sku.name].extra["gpus"] = gpu_count
 
     def _add_prices(self, location: str, size_map: dict[str, VirtualMachineSize]) -> list[VirtualMachineSize]:
         results: list[VirtualMachineSize] = []
@@ -238,7 +254,8 @@ class AzureConnector(BaseConnector):
             for meter_name in meter.meter_name.split("/"):
                 size_name = f"Standard_{meter_name.replace(' ', '_')}"
                 if vm_size := size_map.get(size_name):
-                    vm_size.extra = {"price": meter.meter_rates["0"], "description": meter.meter_sub_category}
+                    vm_size.extra["price"] = meter.meter_rates["0"]
+                    vm_size.extra["description"] = meter.meter_sub_category
                     if vm_size.name not in already_added:
                         already_added.add(vm_size.name)
                         results.append(vm_size)
