@@ -8,9 +8,9 @@ KEY=/opt/swm/spool/secure/node/key.pem
 CA=/opt/swm/spool/secure/cluster/ca-chain-cert.pem
 PEM_DATA=$(make_pem_data $CERT $KEY)
 
-PUBLISHER=Canonical
-OFFER=0001-com-ubuntu-server-jammy
-#SKUS=22_04-lts
+PUBLISHER=microsoft-dsvm
+OFFER=ubuntu-hpc
+#SKUS=2204
 
 PORT=8444
 HOST=$(hostname -s)
