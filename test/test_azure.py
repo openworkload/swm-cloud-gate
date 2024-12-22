@@ -59,6 +59,7 @@ class TestAzureGate(asynctest.TestCase):
                 "flavors": [
                     {
                         "cpus": 2,
+                        "gpus": 0,
                         "id": "9348abe1-2a12-4ba7-9942-920a58fa887f",
                         "mem": 1073,
                         "name": "flavor1",
@@ -67,6 +68,7 @@ class TestAzureGate(asynctest.TestCase):
                     },
                     {
                         "cpus": 8,
+                        "gpus": 0,
                         "id": "5acfa3a8-991b-4e5e-822b-3fadbfc93f9a",
                         "mem": 2147,
                         "name": "flavor2",

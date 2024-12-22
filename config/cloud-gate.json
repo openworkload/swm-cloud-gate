@@ -1,0 +1,15 @@
+{
+  "base": {
+    "cache_expire": 7200000,
+    "cache_dir": "~/.cache/swm"
+  },
+
+  "azure": {
+    "storage": {
+       "container_name": ""
+    }
+  },
+
+  "openstack": {
+  }
+}

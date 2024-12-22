@@ -1,19 +1,37 @@
 import os
+import json
+from pathlib import Path
 from functools import lru_cache
 
-from pydantic import BaseSettings
+from pydantic import Field, BaseModel, ConfigDict, BaseSettings
 
-USER_DIR = os.path.expanduser("~")
+
+class AzureStorage(BaseModel):
+    account: str
+    token: str
+
+
+class AzureSettings(BaseModel):
+    storage: AzureStorage
+
+
+class OpenStackSettings(BaseModel):
+    pass
+
+
+class BaseConfig(BaseModel):
+    cache_expire: int = Field(14 * 24 * 3600)
+    cache_dir: str = Field(os.path.expanduser("~/.cache/swm"))
 
 
 class Settings(BaseSettings):
-    cache_expire: int = 14 * 24 * 3600
-    cache_dir: str
-
-    class Config:
-        env_file = f"{USER_DIR}/.swm/cloud-gate.conf"
+    base: BaseConfig
+    azure: AzureSettings | None = None
+    openstack: OpenStackSettings | None = None
 
 
 @lru_cache()
-def get_settings(cache_dir: str = f"{USER_DIR}/.cache/swm") -> Settings:
-    return Settings(cache_dir=cache_dir)
+def get_settings(config_file: Path) -> Settings:
+    with open(config_file, "r") as file:
+        config_data = json.load(file)
+    return Settings(**config_data)

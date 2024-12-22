@@ -47,7 +47,15 @@ def convert_to_partition(stack: typing.Dict[str, typing.Any]) -> PartInfo:
 
 
 def convert_to_flavor(data: NodeSize) -> Flavor:
-    return Flavor(id=data.id, name=data.name, cpus=data.vcpus, mem=data.ram, storage=data.disk, price=data.price)
+    return Flavor(
+        id=data.id,
+        name=data.name,
+        cpus=data.vcpus,
+        gpus=0,
+        mem=data.ram,
+        storage=data.disk,
+        price=data.price,
+    )
 
 
 def convert_to_image(image: NodeImage) -> ImageInfo:

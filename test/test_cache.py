@@ -1,8 +1,9 @@
+import json
 import pickle
 import unittest
 from pathlib import Path
 from datetime import datetime, timedelta
-from tempfile import TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 from swmcloudgate import cache
 from swmcloudgate.routers.models import BaseModel
@@ -12,7 +13,11 @@ class TestCache(unittest.TestCase):
     def setUp(self):
         self._cache_dir = Path(TemporaryDirectory().name)
         self._cache_dir.mkdir(parents=True, exist_ok=True)
-        self._cache = cache.data_cache("test_data_kind", "test", str(self._cache_dir))
+        self._config_file = NamedTemporaryFile()
+        data = {"base": {"cache_dir": self._cache_dir.as_posix()}}
+        with open(self._config_file.name, "w") as json_file:
+            json.dump(data, json_file, indent=4)
+        self._cache = cache.data_cache("test_data_kind", "test", Path(self._config_file.name))
 
     def test_fetch_and_update(self):
         self.assertIsNone(self._cache.fetch_and_update(["key1", "key2"]))

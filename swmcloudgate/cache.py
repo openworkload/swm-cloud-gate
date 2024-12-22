@@ -1,3 +1,4 @@
+import os
 import atexit
 import pickle  # nosec B403
 import logging
@@ -33,12 +34,12 @@ class Cache:
 
     @property
     def expire(self) -> int:
-        return self._settings.cache_expire
+        return self._settings.base.cache_expire
 
     def fetch_and_update(self, key: list[str]) -> list[BaseModel] | None:
         LOG.debug(f"Try to fetch {self._data_kind} from in-memory cache by key: {key}")
         for timestamp, cached_key, cached_value in self._data[:]:
-            if timestamp >= datetime.now() - timedelta(seconds=self._settings.cache_expire):
+            if timestamp >= datetime.now() - timedelta(seconds=self._settings.base.cache_expire):
                 if key == cached_key:
                     return cached_value
         return None
@@ -51,7 +52,7 @@ class Cache:
         data: list[tuple[datetime, list[str], list[BaseModel]]] = []
         found = False
         now = datetime.now()
-        fresh_timestamp = now - timedelta(seconds=self._settings.cache_expire)
+        fresh_timestamp = now - timedelta(seconds=self._settings.base.cache_expire)
         for timestamp, cached_key, cached_value in self._data:
             if cached_key == key:
                 if timestamp < fresh_timestamp:
@@ -78,9 +79,11 @@ class Cache:
         return changed, deleted
 
     def _load_from_filesystem(self) -> tuple[list[tuple[datetime, list[str], list[BaseModel]]], Path]:
-        LOG.debug(f"Load cache data from directory: {self._settings.cache_dir}")
+        LOG.debug(f"Load cache data from directory: {self._settings.base.cache_dir}")
         data: list[tuple[datetime, list[str], list[BaseModel]]] = []
-        cache_file_path = Path(f"{self._settings.cache_dir}/cloud-gate-{self._data_provider}-{self._data_kind}.dat")
+        cache_file_path = Path(
+            f"{self._settings.base.cache_dir}/cloud-gate-{self._data_provider}-{self._data_kind}.dat"
+        )
         if cache_file_path.exists():
             data = self._read(cache_file_path)
         else:
@@ -109,8 +112,12 @@ class Cache:
 
 
 @lru_cache(maxsize=64)
-def data_cache(data_kind: str, data_provider: str, cache_dir: str = "") -> Cache:
-    settings = config.get_settings(cache_dir) if cache_dir else config.get_settings()
+def data_cache(
+    data_kind: str,
+    data_provider: str,
+    config_file: Path = Path(os.path.expanduser("~/.swm/cloud-gate.json")),
+) -> Cache:
+    settings = config.get_settings(config_file)
     return Cache(data_kind, data_provider, settings)
 
 

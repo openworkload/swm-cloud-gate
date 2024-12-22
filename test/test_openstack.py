@@ -52,9 +52,10 @@ class TestOpenstackGate(asynctest.TestCase):
             data,
             {
                 "flavors": [
-                    {"cpus": 2, "id": "p1", "mem": 1073741824, "name": "flavor1", "price": 3.0, "storage": 12884901888},
+                    {"cpus": 2, "id": "p1", "gpus": 0, "mem": 1073741824, "name": "flavor1", "price": 3.0, "storage": 12884901888},
                     {
                         "cpus": 8,
+                        "gpus": 0,
                         "id": "p2",
                         "mem": 2147483648,
                         "name": "flavor2",
