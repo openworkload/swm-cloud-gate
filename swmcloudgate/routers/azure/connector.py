@@ -328,6 +328,9 @@ class AzureConnector(BaseConnector):
         container_registry: str,
         container_registry_username: str,
         container_registry_password: str,
+        storage_account: str,
+        storage_key: str,
+        storage_container: str,
         runtime_params: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
@@ -341,6 +344,9 @@ class AzureConnector(BaseConnector):
             container_registry=container_registry,
             container_registry_username=container_registry_username,
             container_registry_password=container_registry_password,
+            storage_account=storage_account,
+            storage_key=storage_key,
+            storage_container=storage_container,
         )
         return script
 
@@ -406,6 +412,9 @@ class AzureConnector(BaseConnector):
         container_image: str,
         container_registry_username: str,
         container_registry_password: str,
+        storage_account: str,
+        storage_key: str,
+        storage_container: str,
         flavor_name: str,
         username: str,
         count: str,
@@ -437,6 +446,9 @@ class AzureConnector(BaseConnector):
             container_registry,
             container_registry_username,
             container_registry_password,
+            storage_account,
+            storage_key,
+            storage_container,
             runtime_params,
         )
 

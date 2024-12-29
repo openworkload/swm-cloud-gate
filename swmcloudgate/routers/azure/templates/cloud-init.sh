@@ -3,6 +3,65 @@
 HOST_NAME=$(hostname)
 SWM_ROOT="/opt/swm"
 
+mount_azure_storage() {
+    echo Mount Azure storage
+
+    pushd /tmp
+    wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb
+    dpkg -i packages-microsoft-prod.deb
+    apt-get update
+    apt-get install fuse3 blobfuse2 -y
+    popd
+
+    local azure_storage_account={{ storage_account }}
+    local azure_storage_key={{ storage_key }}
+    local azure_storage_container={{ storage_container }}
+
+    local config_file=/etc/blobfuse2.yaml
+    local cache_dir=/tmp/blobfuse2.cache
+    local mount_dir=/mnt/blob
+
+    mkdir -p $cache_dir
+    mkdir -p $mount_dir
+
+    cat << EOF > $config_file
+allow-other: true
+logging:
+  type: syslog
+  level: log_debug
+  components:
+    - libfuse
+    - file_cache
+    - attr_cache
+    - azstorage
+libfuse:
+  attribute-expiration-sec: 120
+  entry-expiration-sec: 120
+  negative-entry-expiration-sec: 240
+file_cache:
+  path: $cache_dir
+  timeout-sec: 120
+  max-size-mb: 4096
+attr_cache:
+  timeout-sec: 7200
+azstorage:
+  type: block
+  account-name: $azure_storage_account
+  account-key: $azure_storage_key
+  endpoint: https://$azure_storage_account.blob.core.windows.net
+  mode: key
+  container: $azure_storage_container
+EOF
+    chmod 600 $config_file
+
+    echo Config file:
+    cat $config_file
+    echo
+
+    echo Try to mount $mount_dir:
+    blobfuse2 mount $mount_dir --config-file=$config_file --read-only
+}
+
 create_directories() {
     if [[ "{{ swm_source }}" == "ssh" ]]; then
         echo $(date) ": create directory $SWM_ROOT"
@@ -107,6 +166,8 @@ setup_mounts() {
         systemctl restart docker # fix rare "connection closed" issues
     fi
     echo
+
+    mount_azure_storage
 }
 
 setup_docker() {
@@ -151,4 +212,3 @@ echo
 echo $(date) ": the initialization has finished successfully."
 
 exit 0
-
