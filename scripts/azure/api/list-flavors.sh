@@ -9,7 +9,7 @@ CA=$HOME/.swm/spool/secure/cluster/ca-chain-cert.pem
 PEM_DATA=$(make_pem_data $CERT $KEY)
 
 PORT=8444
-HOST=$(hostname -s)
+HOST=$(hostname -f)
 
 REQUEST=GET
 HEADER1="Accept: application/json"

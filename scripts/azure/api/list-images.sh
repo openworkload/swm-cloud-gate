@@ -13,7 +13,7 @@ OFFER=ubuntu-hpc
 #SKUS=2204
 
 PORT=8444
-HOST=$(hostname -s)
+HOST=$(hostname -f)
 
 REQUEST=GET
 HEADER1="Accept: application/json"
