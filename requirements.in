@@ -16,7 +16,7 @@ pydantic
 python-dotenv
 jinja2
 ruff
-uvicorn
+uvicorn >= 0.34.2
 twine
 wheel
 

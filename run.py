@@ -13,7 +13,7 @@ def main():
     uvicorn.run(
         "swmcloudgate.main:app",
         log_config=f"{my_dir}/swmcloudgate/logging.yaml",
-        host=socket.gethostname(),
+        host=socket.getfqdn(),
         port=8444,
         reload=False,
         workers=8,
