@@ -1,7 +1,7 @@
 {
   "base": {
     "cache_expire": 7200000,
-    "cache_dir": "~/.cache/swm"
+    "cache_dir": "~/.swm/spool/cache"
   },
 
   "azure": {

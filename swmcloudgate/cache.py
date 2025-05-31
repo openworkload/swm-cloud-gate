@@ -83,7 +83,7 @@ class Cache:
         data: list[tuple[datetime, list[str], list[BaseModel]]] = []
         cache_file_path = Path(
             f"{self._settings.base.cache_dir}/cloud-gate-{self._data_provider}-{self._data_kind}.dat"
-        )
+        ).expanduser()
         if cache_file_path.exists():
             data = self._read(cache_file_path)
         else:
