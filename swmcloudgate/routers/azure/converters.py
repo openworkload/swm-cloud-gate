@@ -12,6 +12,8 @@ LOG = logging.getLogger("swm")
 
 
 def extract_parameters(data: str) -> dict[str, str]:
+    if not data:
+        return {}
     result: dict[str, str] = {}
     for pair in data.split(";"):
         words = pair.split("=")
