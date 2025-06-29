@@ -205,7 +205,7 @@ class AzureConnector(BaseConnector):
         return result
 
     def _add_gpus(self, location: str, size_map: dict[str, VirtualMachineSize]) -> None:
-        LOG.debug(f"Retrieve GPU flavors information from Azure")
+        LOG.debug("Retrieve GPU flavors information from Azure")
         skus = self._compute_client.resource_skus.list()
         for sku in skus:
             if sku.resource_type.lower() != "virtualmachines":

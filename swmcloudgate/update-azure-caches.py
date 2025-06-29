@@ -49,7 +49,7 @@ OFFER = "ubuntu-hpc"
 
 
 def read_credentials(provider) -> dict[str, typing.Any]:
-    creds_path = Path.home() / f".swm/credentials.json"
+    creds_path = Path.home() / ".swm/credentials.json"
     with open(creds_path) as f:
         return json.load(f)["azure"]
 

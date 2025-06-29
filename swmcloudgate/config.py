@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from functools import lru_cache
 
-from pydantic import Field, BaseModel, ConfigDict, BaseSettings
+from pydantic import Field, BaseModel, BaseSettings
 
 
 class AzureStorage(BaseModel):
