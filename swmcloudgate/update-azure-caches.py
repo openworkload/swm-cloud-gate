@@ -29,12 +29,15 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+import ssl
 import json
 import socket
 import typing
 from pathlib import Path
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.poolmanager import PoolManager
 
 HOME = str(Path.home())
 CERT = f"{HOME}/.swm/spool/secure/node/cert.pem"
@@ -83,9 +86,14 @@ def main() -> None:
         print(f"\nERROR: {e}")
 
 
+class TLS13Adapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        ctx = ssl.create_default_context()
+        self.poolmanager = PoolManager(*args, ssl_context=ctx, **kwargs)
+
+
 def list_flavors(creds: dict[str, typing.Any], pem_data: str) -> None:
     url = f"https://{HOST}:{PORT}/azure/flavors"
-    print(f"Connect to {url} using certificates: {CERT}, {KEY}, {CA}")
     headers = {
         "Accept": "application/json",
         "subscriptionid": creds["subscriptionid"],
@@ -95,22 +103,23 @@ def list_flavors(creds: dict[str, typing.Any], pem_data: str) -> None:
     }
     body = {"pem_data": pem_data}
 
-    response = requests.get(
+    session = requests.Session()
+    session.mount("https://", TLS13Adapter())
+    response = session.get(
         url,
         headers=headers,
         json=body,
         cert=(CERT, KEY),
-        # verify=CA,
-        verify=False,
+        verify=CA,
     )
+
     response.raise_for_status()
-    result = response.text
-    print(f"Flavors: {result}")
+    json_data = response.json()
+    print(f"Cached {len(json_data.get('flavors', []))} VM flavors")
 
 
 def list_images(creds: dict[str, typing.Any], pem_data: str) -> None:
     url = f"https://{HOST}:{PORT}/azure/images"
-    print(f"Connect to {url} using certificates: {CERT}, {KEY}, {CA}")
     headers = {
         "Accept": "application/json",
         "subscriptionid": creds["subscriptionid"],
@@ -120,17 +129,18 @@ def list_images(creds: dict[str, typing.Any], pem_data: str) -> None:
     }
     body = {"pem_data": pem_data}
 
-    response = requests.get(
+    session = requests.Session()
+    session.mount("https://", TLS13Adapter())
+    response = session.get(
         url,
         headers=headers,
         json=body,
         cert=(CERT, KEY),
-        # verify=CA,
-        verify=False,
+        verify=CA,
     )
     response.raise_for_status()
     json_data = response.json()
-    print(f"JSON images: {json_data}")
+    print(f"Cached {len(json_data.get('images', []))} VM images")
 
 
 if __name__ == "__main__":
