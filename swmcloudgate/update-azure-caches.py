@@ -30,6 +30,7 @@
 #
 
 import ssl
+import os
 import json
 import socket
 import typing
@@ -39,10 +40,10 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.poolmanager import PoolManager
 
-HOME = str(Path.home())
-CERT = f"{HOME}/.swm/spool/secure/node/cert.pem"
-KEY = f"{HOME}/.swm/spool/secure/node/key.pem"
-CA = f"{HOME}/.swm/spool/secure/cluster/ca-chain-cert.pem"
+SWM_SPOOL = os.getenv("SWM_SPOOL", (Path.home() / '.swm/spool').as_posix())
+CERT = f"{SWM_SPOOL}/secure/node/cert.pem"
+KEY = f"{SWM_SPOOL}/secure/node/key.pem"
+CA = f"{SWM_SPOOL}/secure/cluster/ca-chain-cert.pem"
 
 HOST = socket.getfqdn()
 PORT = 8444
@@ -51,10 +52,10 @@ PUBLISHER = "microsoft-dsvm"
 OFFER = "ubuntu-hpc"
 
 
-def read_credentials(provider) -> dict[str, typing.Any]:
-    creds_path = Path.home() / ".swm/credentials.json"
+def read_credentials(provider: str) -> dict[str, typing.Any]:
+    creds_path = os.getenv("SWM_CLOUD_CREDENTIALS_FILE", Path.home() / ".swm/credentials.json")
     with open(creds_path) as f:
-        return json.load(f)["azure"]
+        return json.load(f)[provider]
 
 
 def make_pem_data(cert_path: str, key_path: str) -> str:

@@ -99,7 +99,7 @@ setup_swm_worker() {
         mkdir /opt/swm/spool
         source /opt/swm/*/scripts/swm.env
 
-        ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py -p ${SWM_ROOT} -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup.config
+        ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py -v ${SWM_VERSION} -p ${SWM_ROOT} -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup.config
 
     elif [[ "{{ swm_source }}" == "http://*.tar.gz" ]]; then
         TMP_DIR=$(mktemp -d -t swm-worker-XXXXX)

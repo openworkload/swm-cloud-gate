@@ -2,12 +2,15 @@ import http
 import typing
 import logging
 import traceback
+import json
 
+from azure.core.exceptions import HttpResponseError
 from fastapi import Body, Header, APIRouter, HTTPException
 
 from ..models import HttpBody, PartInfo
 from .connector import AzureConnector
 from .converters import convert_to_partition
+from .converters import extract_partition_from_deployment_id
 
 LOG = logging.getLogger("swm")
 CONNECTOR = AzureConnector()
@@ -73,6 +76,32 @@ async def create_partition(
         )
         if result:
             return {"partition": convert_to_partition(result, resource_group_name)}
+    except HttpResponseError as e:
+        if resp := getattr(e, "response", None):
+            data = None
+            try:
+                data = resp.text()
+            except Exception:
+                pass
+            try:
+                data_json = json.loads(data)
+            except Exception:
+                pass
+            error_messages: list[str] = []
+            partition = None
+            if isinstance(data_json, dict):
+                if status := data_json.get("status"):
+                    error_messages.append(str(status))
+                if error := data_json.get("error"):
+                    if isinstance(error, dict):
+                        if target := error.get("target"):
+                            partition = extract_partition_from_deployment_id(target, status="failed")
+                        for detail in error.get("details", []):
+                            if message := detail.get("message"):
+                                error_messages.append(str(message))
+            LOG.error(f"From Azure:\n{json.dumps(data_json, indent=2)}")
+            LOG.debug(f"Partition: {partition}")
+            return {"error": f"Error from Azure: {'; '.join(error_messages)}", "partition": partition}
     except Exception as e:
         LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}

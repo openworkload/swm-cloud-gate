@@ -2,6 +2,8 @@ import uuid
 import typing
 import hashlib
 import logging
+import re
+import traceback
 
 from azure.mgmt.compute.models import VirtualMachineSize, VirtualMachineImage
 from azure.mgmt.resource.resources.models import DeploymentExtended
@@ -9,6 +11,10 @@ from azure.mgmt.resource.resources.models import DeploymentExtended
 from ..models import Flavor, PartInfo, ImageInfo
 
 LOG = logging.getLogger("swm")
+PART_ID_PATTERN = re.compile(
+    r"^(/subscriptions/[^/]+/resourceGroups/[^/]+)(?:/|$)",
+    re.IGNORECASE,
+)
 
 
 def extract_parameters(data: str) -> dict[str, str]:
@@ -104,3 +110,13 @@ def convert_to_partition(data: dict[str, typing.Any], resource_group_name: str) 
         part.status = "succeeded"
 
     return part
+
+
+def extract_partition_from_deployment_id(resource_id: str, status: str) -> PartInfo | None:
+    if isinstance(resource_id, str):
+        resource_id = resource_id.strip()
+        if m1 := PART_ID_PATTERN.search(resource_id):
+            if part_id := m1.group(1):
+                if part_name := part_id.split("/")[-1]:
+                    return PartInfo(id=part_id, name=part_name, status = status)
+    return None
