@@ -29,33 +29,24 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-import ssl
 import os
-import json
+import ssl
 import socket
-import typing
 from pathlib import Path
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.poolmanager import PoolManager
 
-SWM_SPOOL = os.getenv("SWM_SPOOL", (Path.home() / '.swm/spool').as_posix())
+import config
+
+SWM_SPOOL = os.getenv("SWM_SPOOL", (Path.home() / ".swm/spool").as_posix())
 CERT = f"{SWM_SPOOL}/secure/node/cert.pem"
 KEY = f"{SWM_SPOOL}/secure/node/key.pem"
 CA = f"{SWM_SPOOL}/secure/cluster/ca-chain-cert.pem"
 
 HOST = socket.getfqdn()
 PORT = 8444
-
-PUBLISHER = "microsoft-dsvm"
-OFFER = "ubuntu-hpc"
-
-
-def read_credentials(provider: str) -> dict[str, typing.Any]:
-    creds_path = os.getenv("SWM_CLOUD_CREDENTIALS_FILE", Path.home() / ".swm/credentials.json")
-    with open(creds_path) as f:
-        return json.load(f)[provider]
 
 
 def make_pem_data(cert_path: str, key_path: str) -> str:
@@ -77,12 +68,21 @@ def make_pem_data(cert_path: str, key_path: str) -> str:
 
 
 def main() -> None:
-    creds = read_credentials("azure")
+
+    settings = config.get_settings()
+
+    subscription_id = settings.providers.azure.api_credentials.subscription_id
+    tenant_id = settings.providers.azure.api_credentials.tenant_id
+    app_id = settings.providers.azure.api_credentials.app_id
+
+    publisher = settings.providers.azure.vm_image.publisher
+    offer = settings.providers.azure.vm_image.offer
+
     pem_data = make_pem_data(CERT, KEY)
 
     try:
-        list_flavors(creds, pem_data)
-        list_images(creds, pem_data)
+        list_flavors(subscription_id, tenant_id, app_id, pem_data)
+        list_images(subscription_id, tenant_id, app_id, publisher, offer, pem_data)
     except requests.exceptions.SSLError as e:
         print(f"\nERROR: {e}")
 
@@ -93,13 +93,13 @@ class TLS13Adapter(HTTPAdapter):
         self.poolmanager = PoolManager(*args, ssl_context=ctx, **kwargs)
 
 
-def list_flavors(creds: dict[str, typing.Any], pem_data: str) -> None:
+def list_flavors(subscription_id: str, tenant_id: str, app_id: str, pem_data: str) -> None:
     url = f"https://{HOST}:{PORT}/azure/flavors"
     headers = {
         "Accept": "application/json",
-        "subscriptionid": creds["subscriptionid"],
-        "tenantid": creds["tenantid"],
-        "appid": creds["appid"],
+        "subscriptionid": subscription_id,
+        "tenantid": tenant_id,
+        "appid": app_id,
         "extra": "location=eastus",
     }
     body = {"pem_data": pem_data}
@@ -119,14 +119,21 @@ def list_flavors(creds: dict[str, typing.Any], pem_data: str) -> None:
     print(f"Cached {len(json_data.get('flavors', []))} VM flavors")
 
 
-def list_images(creds: dict[str, typing.Any], pem_data: str) -> None:
+def list_images(
+    subscription_id: str,
+    tenant_id: str,
+    app_id: str,
+    publisher: str,
+    offer: str,
+    pem_data: str,
+) -> None:
     url = f"https://{HOST}:{PORT}/azure/images"
     headers = {
         "Accept": "application/json",
-        "subscriptionid": creds["subscriptionid"],
-        "tenantid": creds["tenantid"],
-        "appid": creds["appid"],
-        "extra": f"location=eastus;publisher={PUBLISHER};offer={OFFER}",
+        "subscriptionid": subscription_id,
+        "tenantid": tenant_id,
+        "appid": app_id,
+        "extra": f"location=eastus;publisher={publisher};offer={offer}",
     }
     body = {"pem_data": pem_data}
 

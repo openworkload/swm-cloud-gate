@@ -115,7 +115,7 @@ class Cache:
 def data_cache(
     data_kind: str,
     data_provider: str,
-    config_file: Path = Path(os.path.expanduser("~/.swm/cloud-gate.json")),
+    config_file: Path = Path(os.path.expanduser("~/.swm/cloud-gate.yaml")),
 ) -> Cache:
     settings = config.get_settings(config_file)
     return Cache(data_kind, data_provider, settings)

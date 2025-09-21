@@ -1,6 +1,5 @@
 import os
 import json
-import base64
 import typing
 import logging
 
@@ -62,7 +61,11 @@ class AzureConnector(BaseConnector):
             self._commerce_client = UsageManagementClient(credential, subscription_id)
             self._subscription = SubscriptionClient(credential).subscriptions.get(subscription_id)
         else:
-            LOG.error("Not enough parameters provided to initialize Azure connection")
+            msg = (
+                "Not enough parameters provided to initialize Azure connection:"
+                f"{subscription_id}, {tenant_id}, {app_id}, {len(pem_data)}"
+            )
+            raise Exception(msg)
 
     def _get_deployment_properties(
         self,
@@ -88,7 +91,6 @@ class AzureConnector(BaseConnector):
         )
         LOG.debug(f"Template parameters for job {job_id}: {template_parameters}")
         self._append_security_rules(ports, template)
-        # self._append_cloud_init_script(cloud_init_script, template)
         return {
             "properties": {
                 "template": template,
@@ -116,11 +118,6 @@ class AzureConnector(BaseConnector):
                     }
                     LOG.debug(f"Add security group rule: {rule}")
                     resource["properties"]["securityRules"].append(rule)
-
-    def _append_cloud_init_script(self, cloud_init_script: str, template: str) -> None:
-        cloud_init_yaml = f"#cloud-config\nruncmd: |+\n{self._indent_lines(cloud_init_script, 4)}"
-        encoded = base64.b64encode(cloud_init_yaml.encode("utf-8"))
-        template["variables"]["cloudInit"] = f"[base64('{encoded}')]"
 
     def _indent_lines(self, text: str, indentation: int) -> str:
         lines = text.split("\n")
@@ -332,6 +329,7 @@ class AzureConnector(BaseConnector):
         storage_key: str,
         storage_container: str,
         runtime_params: str,
+        user_ssh_cert: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(loader=template_loader, autoescape=True)
@@ -339,7 +337,7 @@ class AzureConnector(BaseConnector):
         script: str = template.render(
             job_id=job_id,
             swm_source=runtime_params.get("swm_source"),
-            ssh_pub_key=runtime_params.get("ssh_pub_key"),
+            ssh_pub_key=user_ssh_cert,
             container_image=container_image,
             container_registry=container_registry,
             container_registry_username=container_registry_username,
@@ -421,6 +419,7 @@ class AzureConnector(BaseConnector):
         runtime: str,
         location: str,
         ports: str,
+        user_ssh_cert: str,
     ) -> tuple[DeploymentExtended, str]:
         resource_group_name = self._get_resource_group_name(partition_name)
 
@@ -450,6 +449,7 @@ class AzureConnector(BaseConnector):
             storage_key,
             storage_container,
             runtime_params,
+            user_ssh_cert,
         )
 
         deployment_name = self._get_deployment_name(partition_name)
@@ -459,7 +459,7 @@ class AzureConnector(BaseConnector):
             flavor_name,
             os_version,
             username,
-            runtime_params.get("ssh_pub_key"),
+            user_ssh_cert,
             cloud_init_script,
             ports,
         )

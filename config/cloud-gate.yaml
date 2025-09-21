@@ -1,0 +1,24 @@
+version: 1
+
+base:
+  cache_expire: 7200000
+  cache_dir: "~/.swm/spool/cache"
+
+providers:
+  azure:
+    api_credentials:
+      subscription_id: ""
+      tenant_id: ""
+      app_id: ""
+    container_registry:
+      user: ""
+      password: ""
+    storage:
+      account: ""
+      key: ""
+      container: ""
+    vm_image:
+      publisher: "microsoft-dsvm"
+      offer: "ubuntu-hpc"
+      skus: "2204"
+    user_ssh_cert: ""

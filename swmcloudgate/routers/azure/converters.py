@@ -1,9 +1,8 @@
+import re
 import uuid
 import typing
 import hashlib
 import logging
-import re
-import traceback
 
 from azure.mgmt.compute.models import VirtualMachineSize, VirtualMachineImage
 from azure.mgmt.resource.resources.models import DeploymentExtended
@@ -118,5 +117,5 @@ def extract_partition_from_deployment_id(resource_id: str, status: str) -> PartI
         if m1 := PART_ID_PATTERN.search(resource_id):
             if part_id := m1.group(1):
                 if part_name := part_id.split("/")[-1]:
-                    return PartInfo(id=part_id, name=part_name, status = status)
+                    return PartInfo(id=part_id, name=part_name, status=status)
     return None

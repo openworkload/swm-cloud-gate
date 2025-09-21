@@ -2,7 +2,6 @@
 
 source $(dirname "$0")/helpers.sh
 
-CREDS=$(read_credentials azure)
 CERT=$HOME/.swm/spool/secure/node/cert.pem
 KEY=$HOME/.swm/spool/secure/node/key.pem
 CA=$HOME/.swm/spool/secure/cluster/ca-chain-cert.pem
@@ -13,10 +12,7 @@ HOST=$(hostname -f)
 
 REQUEST=GET
 HEADER1="Accept: application/json"
-HEADER2="subscriptionid: $(echo $CREDS | jq -r '.subscriptionid')"
-HEADER3="tenantid: $(echo $CREDS | jq -r '.tenantid')"
-HEADER4="appid: $(echo $CREDS | jq -r '.appid')"
-HEADER5="extra: location=eastus"
+HEADER2="extra: location=eastus2"
 URL="https://${HOST}:${PORT}/azure/flavors"
 BODY='{"pem_data": '${PEM_DATA}'}'
 
@@ -26,9 +22,6 @@ json=$(curl --request ${REQUEST}\
      --key ${KEY}\
      --header "${HEADER1}"\
      --header "${HEADER2}"\
-     --header "${HEADER3}"\
-     --header "${HEADER4}"\
-     --header "${HEADER5}"\
      --data-raw "${BODY}" \
      ${URL} 2>/dev/null)
 

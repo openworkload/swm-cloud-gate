@@ -36,6 +36,7 @@ dependencies = [
     "asynctest",
     "fastapi==0.63.0",
     "pyyaml",
+    "pydantic",
     "python-dotenv",
     "jinja2",
     "uvicorn",
