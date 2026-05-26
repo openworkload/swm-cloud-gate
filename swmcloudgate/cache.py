@@ -1,4 +1,3 @@
-import os
 import atexit
 import pickle  # nosec B403
 import logging
@@ -11,6 +10,8 @@ from pydantic import BaseModel
 from swmcloudgate import config
 
 LOG = logging.getLogger("swm")
+
+DEFAULT_CONFIG_FILE: Path = Path.home() / ".swm" / "cloud-gate.yaml"
 
 
 class Cache:
@@ -115,7 +116,7 @@ class Cache:
 def data_cache(
     data_kind: str,
     data_provider: str,
-    config_file: Path = Path(os.path.expanduser("~/.swm/cloud-gate.yaml")),
+    config_file: Path = DEFAULT_CONFIG_FILE,
 ) -> Cache:
     settings = config.get_settings(config_file)
     return Cache(data_kind, data_provider, settings)
