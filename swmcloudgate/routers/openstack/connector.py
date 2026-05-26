@@ -24,6 +24,7 @@ SERVICE_NAMES = {"compute": "nova", "orchestration": "heat", "rating": "cloudkit
 
 class OpenStackConnector(BaseConnector):
     def __init__(self, username: str = None, password: str = None, service: str = None):
+        self._driver = None
         self._init_driver(username, password, service)
         super().__init__("openstack")
 
