@@ -101,12 +101,14 @@ async def create_partition(
             data = None
             try:
                 data = resp.text()
-            except Exception:
-                pass
-            try:
-                data_json = json.loads(data)
-            except Exception:
-                pass
+            except Exception as text_err:
+                LOG.debug(f"Could not read Azure error response body: {text_err}")
+            data_json = None
+            if data is not None:
+                try:
+                    data_json = json.loads(data)
+                except Exception as json_err:
+                    LOG.debug(f"Azure error response body is not JSON: {json_err}")
             error_messages: list[str] = []
             partition = None
             if isinstance(data_json, dict):
