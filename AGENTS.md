@@ -7,3 +7,7 @@ Guidance for coding agents working on this repository. The codebase is primarily
 * Run static checks:
 1. Start dev container from swm-core directory with `make cr` command.
 2. Go to swm-cloud-gate directory and run `make check`
+
+* Run unit tests:
+1. Start dev container from swm-core directory with `make cr` command.
+2. Go to swm-cloud-gate directory and run `make test`
