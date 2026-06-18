@@ -61,6 +61,15 @@ def load_config(path: str | Path) -> Settings:
     return Settings.parse_obj(data)
 
 
+# Env var override: lets tests (and one-off invocations) point at a different
+# cloud-gate.yaml without threading the path through every caller. Matches the
+# existing SWM_TEST_CONFIG pattern used by BaseConnector for test responses.
+CONFIG_ENV_VAR = "SWM_GATE_CONFIG"
+
+
 @lru_cache()
-def get_settings(config_file: Path = DEFAULT_CONFIG_PATH) -> Settings:
+def get_settings(config_file: Path | None = None) -> Settings:
+    if config_file is None:
+        env_path = os.environ.get(CONFIG_ENV_VAR)
+        config_file = Path(env_path).expanduser() if env_path else DEFAULT_CONFIG_PATH
     return load_config(config_file)

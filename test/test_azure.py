@@ -23,6 +23,12 @@ class TestAzureGate(asynctest.TestCase):
     async def setUp(self):
         self.maxDiff = None
         os.environ["SWM_TEST_CONFIG"] = "test/data/responses.json"
+        # Point routers at a test cloud-gate.yaml that provides non-empty
+        # subscription/tenant/app IDs so the credential guards in the Azure
+        # routes don't short-circuit with "No subscription ID" etc. The
+        # connector also short-circuits real Azure calls when SWM_TEST_CONFIG
+        # is set, so the config values are only used for those presence checks.
+        os.environ["SWM_GATE_CONFIG"] = "test/data/cloud-gate.yaml"
         self.proc = Process(
             target=uvicorn.run,
             args=("swmcloudgate.main:app",),
