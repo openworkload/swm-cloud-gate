@@ -1,5 +1,6 @@
 import os
 import json
+import copy
 import typing
 import logging
 
@@ -20,6 +21,7 @@ LOG = logging.getLogger("swm")
 TEMLPATE_FILE = "swmcloudgate/routers/azure/templates/partition.json"
 CLOUD_INIT_SCRIPT_FILE = "swmcloudgate/routers/azure/templates/cloud-init.sh"
 CLOUD_INIT_YAML = "swmcloudgate/routers/azure/templates/cloud-init.yaml"
+MAX_VM_COUNT = 32
 
 
 class AzureConnector(BaseConnector):
@@ -67,6 +69,21 @@ class AzureConnector(BaseConnector):
             )
             raise Exception(msg)
 
+    def _parse_vm_count(self, count_param: str) -> int:
+        """Parse and validate VM count parameter."""
+        if count_param is None or count_param == "":
+            return 1
+        try:
+            vm_count = int(count_param)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"Invalid VM count '{count_param}': must be an integer") from exc
+
+        if vm_count < 1:
+            raise ValueError(f"Invalid VM count {vm_count}: must be greater than or equal to 1")
+        if vm_count > MAX_VM_COUNT:
+            raise ValueError(f"Invalid VM count {vm_count}: maximum supported count is {MAX_VM_COUNT}")
+        return vm_count
+
     def _get_deployment_properties(
         self,
         job_id: str,
@@ -77,6 +94,7 @@ class AzureConnector(BaseConnector):
         user_pub_key: str,
         cloud_init_script: str,
         ports: str,
+        vm_count: int,
     ) -> dict[str, dict[str, typing.Any]]:
         with open(TEMLPATE_FILE) as template_file:
             template = json.load(template_file)
@@ -91,6 +109,7 @@ class AzureConnector(BaseConnector):
         )
         LOG.debug(f"Template parameters for job {job_id}: {template_parameters}")
         self._append_security_rules(ports, template)
+        self._add_compute_vms(partition_name, vm_count, template)
         return {
             "properties": {
                 "template": template,
@@ -98,6 +117,129 @@ class AzureConnector(BaseConnector):
                 "mode": DeploymentMode.incremental,
             }
         }
+
+    def _find_resource(self, resources: list[dict[str, typing.Any]], resource_type: str) -> dict[str, typing.Any] | None:
+        for resource in resources:
+            if resource.get("type") == resource_type:
+                return resource
+        return None
+
+    def _find_vm_extension_resources(self, resources: list[dict[str, typing.Any]]) -> list[dict[str, typing.Any]]:
+        return [resource for resource in resources if resource.get("type") == "Microsoft.Compute/virtualMachines/extensions"]
+
+    def _append_dependency(self, resource: dict[str, typing.Any], dependency: str) -> None:
+        depends_on = resource.setdefault("dependsOn", [])
+        if dependency not in depends_on:
+            depends_on.append(dependency)
+
+    def _remove_dependency(self, resource: dict[str, typing.Any], dependency: str) -> None:
+        depends_on = resource.get("dependsOn", [])
+        resource["dependsOn"] = [item for item in depends_on if item != dependency]
+
+    def _replace_vm_reference(self, value: typing.Any, compute_vm_name: str) -> typing.Any:
+        if isinstance(value, str):
+            return value.replace("parameters('vmNameMain')", f"'{compute_vm_name}'")
+        if isinstance(value, list):
+            return [self._replace_vm_reference(item, compute_vm_name) for item in value]
+        if isinstance(value, dict):
+            return {key: self._replace_vm_reference(item, compute_vm_name) for key, item in value.items()}
+        return value
+
+    def _strip_public_ip(self, nic_resource: dict[str, typing.Any]) -> None:
+        ip_configurations = nic_resource.get("properties", {}).get("ipConfigurations", [])
+        if not ip_configurations:
+            return
+        ip_configuration_properties = ip_configurations[0].get("properties", {})
+        ip_configuration_properties.pop("publicIPAddress", None)
+
+    def _clone_compute_nic(
+        self,
+        network_interface_resource: dict[str, typing.Any],
+        compute_nic_name: str,
+    ) -> dict[str, typing.Any]:
+        compute_nic_resource = copy.deepcopy(network_interface_resource)
+        compute_nic_resource["name"] = f"[format('{compute_nic_name}')]"
+        self._strip_public_ip(compute_nic_resource)
+        public_ip_dependency = "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPAddressName'))]"
+        self._remove_dependency(compute_nic_resource, public_ip_dependency)
+        return compute_nic_resource
+
+    def _clone_compute_vm(
+        self,
+        main_vm_resource: dict[str, typing.Any],
+        compute_vm_name: str,
+        compute_nic_name: str,
+    ) -> dict[str, typing.Any]:
+        compute_vm_resource = copy.deepcopy(main_vm_resource)
+        compute_vm_resource["name"] = f"[format('{compute_vm_name}')]"
+        compute_vm_resource["properties"]["networkProfile"]["networkInterfaces"][0]["id"] = (
+            f"[resourceId('Microsoft.Network/networkInterfaces', '{compute_nic_name}')]"
+        )
+        compute_vm_resource["properties"]["osProfile"]["computerName"] = f"[format('{compute_vm_name}')]"
+        compute_nic_dependency = f"[resourceId('Microsoft.Network/networkInterfaces', '{compute_nic_name}')]"
+        original_nic_dependency = "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
+        self._append_dependency(compute_vm_resource, compute_nic_dependency)
+        self._remove_dependency(compute_vm_resource, original_nic_dependency)
+        return compute_vm_resource
+
+    def _clone_compute_vm_extension(
+        self,
+        extension_resource: dict[str, typing.Any],
+        compute_vm_name: str,
+    ) -> dict[str, typing.Any]:
+        compute_extension_resource = copy.deepcopy(extension_resource)
+        compute_extension_resource = self._replace_vm_reference(compute_extension_resource, compute_vm_name)
+        extension_name = extension_resource.get("name", "")
+        if "variables('extensionName')" in extension_name:
+            compute_extension_resource["name"] = f"[format('{compute_vm_name}/{{0}}', variables('extensionName'))]"
+        compute_vm_dependency = f"[resourceId('Microsoft.Compute/virtualMachines', '{compute_vm_name}')]"
+        original_vm_dependency = "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmNameMain'))]"
+        self._append_dependency(compute_extension_resource, compute_vm_dependency)
+        self._remove_dependency(compute_extension_resource, original_vm_dependency)
+        return compute_extension_resource
+
+    def _add_compute_vms(
+        self,
+        partition_name: str,
+        vm_count: int,
+        template: dict[str, typing.Any],
+    ) -> None:
+        """Add compute VMs and related resources to the template if vm_count > 1."""
+        if vm_count <= 1:
+            return
+
+        num_compute_vms = vm_count - 1
+        LOG.debug(f"Adding {num_compute_vms} compute VMs to partition {partition_name}")
+
+        resources = template.get("resources", [])
+        main_vm_resource = self._find_resource(resources, "Microsoft.Compute/virtualMachines")
+        if not main_vm_resource:
+            LOG.warning("Could not find main VM resource in template")
+            return
+
+        network_interface_resource = self._find_resource(resources, "Microsoft.Network/networkInterfaces")
+        if not network_interface_resource:
+            LOG.warning("Could not find network interface resource in template")
+            return
+
+        extension_resources = self._find_vm_extension_resources(resources)
+
+        for i in range(num_compute_vms):
+            compute_index = i + 1
+            compute_vm_name = f"{partition_name}-compute{compute_index}"
+            compute_nic_name = f"{partition_name}-compute{compute_index}-NetInt"
+
+            compute_nic_resource = self._clone_compute_nic(network_interface_resource, compute_nic_name)
+            resources.append(compute_nic_resource)
+
+            compute_vm_resource = self._clone_compute_vm(main_vm_resource, compute_vm_name, compute_nic_name)
+            resources.append(compute_vm_resource)
+
+            for extension_resource in extension_resources:
+                compute_extension_resource = self._clone_compute_vm_extension(extension_resource, compute_vm_name)
+                resources.append(compute_extension_resource)
+
+            LOG.debug(f"Added compute VM {compute_vm_name} to template")
 
     def _append_security_rules(self, ports: str, template: dict[str, typing.Any]) -> None:
         for resource in template["resources"]:
@@ -422,6 +564,8 @@ class AzureConnector(BaseConnector):
         user_ssh_cert: str,
     ) -> tuple[DeploymentExtended, str]:
         resource_group_name = self._get_resource_group_name(partition_name)
+        vm_count = self._parse_vm_count(count)
+        LOG.info(f"Creating deployment with {vm_count} VM(s)")
 
         if self._test_responses:
             new_part = {
@@ -462,6 +606,7 @@ class AzureConnector(BaseConnector):
             user_ssh_cert,
             cloud_init_script,
             ports,
+            vm_count,
         )
         try:
             deployment_async_operation = self._resource_client.deployments.begin_create_or_update(

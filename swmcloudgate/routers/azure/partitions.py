@@ -42,7 +42,7 @@ async def create_partition(
         LOG.debug(f" * containerimage: {containerimage}")
         LOG.debug(f" * flavor: {flavorname}")
         LOG.debug(f" * username: {username}")
-        LOG.debug(f" * extra nodes: {count}")
+        LOG.debug(f" * vm count: {count}")
         LOG.debug(f" * runtime: {runtime}")
         LOG.debug(f" * location: {location}")
         LOG.debug(f" * ports: {ports}")
