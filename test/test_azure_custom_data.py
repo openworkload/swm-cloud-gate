@@ -60,7 +60,10 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
         self.connector._configure_main_vm_custom_data(template)
 
         main_vm = next(
-            resource for resource in template["resources"] if resource["type"] == "Microsoft.Compute/virtualMachines"
+            resource
+            for resource in template["resources"]
+            if resource["type"] == "Microsoft.Compute/virtualMachines"
+            and resource["name"] == "[parameters('vmNameMain')]"
         )
         custom_data = main_vm["properties"]["osProfile"]["customData"]
         self.assertIn("[base64(", custom_data)
