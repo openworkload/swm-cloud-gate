@@ -1,7 +1,35 @@
 #!/bin/bash -ex
 
-HOST_NAME=$(hostname)
+HOST_NAME="{{ host_name }}"
 SWM_ROOT="/opt/swm"
+PRIMARY_INTERFACE=""
+PRIVATE_IP_CIDR=""
+PRIVATE_SUBNET_CIDR=""
+IS_MAIN={{ is_main }}
+MAIN_INSTANCE_HOSTNAME="{{ main_instance_hostname }}"
+MAIN_INSTANCE_PRIVATE_IP="{{ main_instance_private_ip }}"
+
+detect_vm_context() {
+    PRIMARY_INTERFACE=$(ip -4 route list 0/0 | awk 'NR==1 { print $5 }')
+    PRIVATE_IP_CIDR=$(ip -4 -o addr show "$PRIMARY_INTERFACE" | awk 'NR==1 { print $4 }')
+    PRIVATE_SUBNET_CIDR=$(python3 - "$PRIVATE_IP_CIDR" <<'PY'
+import ipaddress
+import sys
+
+network = ipaddress.ip_interface(sys.argv[1]).network
+print(f"{network.network_address}/{network.netmask}")
+PY
+)
+if [[ -z "$PRIVATE_SUBNET_CIDR" ]]; then
+    echo "$(date): could not determine private subnet CIDR" >&2
+    return 1
+fi
+
+if [[ -z "$MAIN_INSTANCE_HOSTNAME" || -z "$MAIN_INSTANCE_PRIVATE_IP" ]]; then
+    echo "$(date): could not determine main instance details" >&2
+    return 1
+fi
+}
 
 mount_azure_storage() {
     echo Mount Azure storage
@@ -130,10 +158,10 @@ setup_swm_worker() {
 }
 
 setup_network() {
-    GATEWAY_IP=$(ip -4 addr show $(ip -4 route list 0/0 | awk -F" " "{ print \$5 }") | grep -oP "(?<=inet\\s)\\d+(\\.\\d+){3}")
-    IS_MAIN=true
-    echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$GATEWAY_IP, master: ${IS_MAIN})"
-    echo $GATEWAY_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
+    detect_vm_context || exit 1
+    VM_PRIVATE_IP="${PRIVATE_IP_CIDR%%/*}"
+    echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$VM_PRIVATE_IP, master: ${IS_MAIN})"
+    echo $VM_PRIVATE_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
     echo $(date) ": /etc/hosts:"
     cat /etc/hosts
     echo
@@ -142,16 +170,16 @@ setup_network() {
 setup_mounts() {
     if [ $IS_MAIN == "true" ];
     then
-        echo "/home $PRIVATE_SUBNET_CIDR(rw,async,no_root_squash)" | sed "s/\\/25/\\/255.255.255.0/g" >> /etc/exports
+        echo "/home $PRIVATE_SUBNET_CIDR(rw,async,no_root_squash)" >> /etc/exports
         echo $(date) ": /etc/exports:"
         cat /etc/exports
         echo
 
-        # Temporary disable for debug purposes
-        #systemctl enable nfs-kernel-server
-        #systemctl restart nfs-kernel-server
-        #echo $(date) ": systemctl | grep nfs:"
-        #systemctl | grep nfs
+        exportfs -ra
+        systemctl enable nfs-kernel-server
+        systemctl restart nfs-kernel-server
+        echo $(date) ": systemctl | grep nfs:"
+        systemctl | grep nfs
 
     else
         echo "$MAIN_INSTANCE_PRIVATE_IP:/home /home nfs rsize=32768,wsize=32768,hard,intr,async 0 0" >> /etc/fstab
