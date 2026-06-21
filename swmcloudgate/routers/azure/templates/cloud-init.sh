@@ -21,7 +21,7 @@ print(f"{network.network_address}/{network.netmask}")
 PY
 )
     if [[ -z "$PRIVATE_SUBNET_CIDR" ]]; then
-        echo $(date) ": could not determine private subnet CIDR" >&2
+    echo "$(date): could not determine private subnet CIDR" >&2
         return 1
     fi
 
@@ -30,7 +30,7 @@ PY
     fi
 
     if [[ -z "$MAIN_INSTANCE_HOSTNAME" || -z "$MAIN_INSTANCE_PRIVATE_IP" ]]; then
-        echo $(date) ": could not determine main instance details" >&2
+        echo "$(date): could not determine main instance details" >&2
         return 1
     fi
 }

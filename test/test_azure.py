@@ -490,11 +490,9 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
     def test_cloud_init_script_detects_main_and_compute_vm_roles(self):
         cloud_init_script = self._render_cloud_init_script()
 
-        self.assertIn('if [[ "$HOST_NAME" == *-main ]]; then', cloud_init_script)
-        self.assertIn(
-            "MAIN_INSTANCE_HOSTNAME=$(echo \"$HOST_NAME\" | sed -E 's/-compute[0-9]+$/-main/')",
-            cloud_init_script,
-        )
+        self.assertIn('HOST_NAME="__SWM_HOST_NAME__"', cloud_init_script)
+        self.assertIn("IS_MAIN=__SWM_IS_MAIN__", cloud_init_script)
+        self.assertIn('MAIN_INSTANCE_HOSTNAME="__SWM_MAIN_INSTANCE_HOSTNAME__"', cloud_init_script)
 
     def test_cloud_init_script_configures_nfs_for_shared_home_mount(self):
         cloud_init_script = self._render_cloud_init_script()
@@ -502,6 +500,5 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         self.assertIn("exportfs -ra", cloud_init_script)
         self.assertIn("systemctl enable nfs-kernel-server", cloud_init_script)
         self.assertIn('echo "$MAIN_INSTANCE_PRIVATE_IP:/home /home nfs', cloud_init_script)
-        self.assertIn('resolved_ip=$(getent hosts "$MAIN_INSTANCE_HOSTNAME"', cloud_init_script)
-        self.assertIn('echo $(date) ": could not resolve $MAIN_INSTANCE_HOSTNAME" >&2', cloud_init_script)
-        self.assertIn('echo $(date) ": could not determine main instance private IP" >&2', cloud_init_script)
+        self.assertNotIn("getent hosts", cloud_init_script)
+        self.assertIn('echo "$(date): could not determine main instance details" >&2', cloud_init_script)

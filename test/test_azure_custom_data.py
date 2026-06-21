@@ -12,8 +12,10 @@ from swmcloudgate.routers.azure.connector import (
 
 
 class TestAzureConnectorCustomData(unittest.TestCase):
+    _test_config = "test/data/responses.json"
+
     def setUp(self):
-        os.environ["SWM_TEST_CONFIG"] = "test/data/responses.json"
+        os.environ["SWM_TEST_CONFIG"] = self._test_config
         self.connector = AzureConnector()
 
     def tearDown(self):
