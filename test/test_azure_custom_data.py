@@ -1,5 +1,6 @@
 import json
 import os
+import shlex
 import unittest
 
 from swmcloudgate.routers.azure.connector import (
@@ -8,6 +9,7 @@ from swmcloudgate.routers.azure.connector import (
     IS_MAIN_PLACEHOLDER,
     MAIN_INSTANCE_HOSTNAME_PLACEHOLDER,
     MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER,
+    STORAGE_KEY_B64_PLACEHOLDER,
 )
 
 
@@ -31,16 +33,16 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             container_image="registry.example.org/image:tag",
             container_registry="registry.example.org",
             container_registry_username="user",
-            container_registry_password="pass",
+            container_registry_password="user<&>\"'pass",
             storage_account="storageaccount",
-            storage_key="storagekey",
             storage_container="storagecontainer",
             runtime_params={"swm_source": "ssh"},
-            user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+            user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC== user@example",
         )
 
     def test_cloud_init_script_uses_explicit_main_instance_placeholders(self):
         cloud_init_script = self._render_cloud_init_script()
+        expected_password = shlex.quote("user<&>\"'pass")
 
         self.assertIn(f'HOST_NAME="{HOST_NAME_PLACEHOLDER}"', cloud_init_script)
         self.assertIn(f"IS_MAIN={IS_MAIN_PLACEHOLDER}", cloud_init_script)
@@ -52,6 +54,23 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             f'MAIN_INSTANCE_PRIVATE_IP="{MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER}"',
             cloud_init_script,
         )
+        self.assertIn(f'local azure_storage_key_b64="{STORAGE_KEY_B64_PLACEHOLDER}"', cloud_init_script)
+        self.assertIn("azure_storage_key=$(printf '%s' \"$azure_storage_key_b64\" | base64 -d)", cloud_init_script)
+        self.assertIn(
+            f"docker login registry.example.org --username user --password {expected_password}",
+            cloud_init_script,
+        )
+        self.assertNotIn(
+            "docker login registry.example.org --username user --password user<&>\"'pass",
+            cloud_init_script,
+        )
+        self.assertIn(
+            "echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC== user@example' >> /root/.ssh/authorized_keys",
+            cloud_init_script,
+        )
+        self.assertNotIn("&lt;", cloud_init_script)
+        self.assertNotIn("&gt;", cloud_init_script)
+        self.assertNotIn("&amp;", cloud_init_script)
         self.assertNotIn("getent hosts", cloud_init_script)
 
     def test_main_vm_custom_data_replaces_placeholders_via_arm(self):
@@ -76,6 +95,7 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             "reference(resourceId('Microsoft.Network/networkInterfaces'",
             custom_data,
         )
+        self.assertIn("base64(parameters('storageKey'))", custom_data)
 
     def test_compute_vm_custom_data_uses_explicit_main_private_ip_reference(self):
         template = self._load_template()
@@ -101,6 +121,7 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             "reference(resourceId('Microsoft.Network/networkInterfaces'",
             custom_data,
         )
+        self.assertIn("base64(parameters('storageKey'))", custom_data)
         self.assertIn(
             "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]",
             compute_vm["dependsOn"],
