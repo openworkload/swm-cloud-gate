@@ -435,7 +435,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         nic_properties = compute_nic["properties"]["ipConfigurations"][0]["properties"]
         self.assertNotIn("publicIPAddress", nic_properties)
 
-    def test_compute_vm_dependencies_include_compute_and_main_nics(self):
+    def test_compute_vm_preserves_main_nic_dependency_and_adds_compute_nic(self):
         template = self._load_template()
 
         self.connector._add_compute_vms("part1", 2, template)

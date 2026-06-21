@@ -188,7 +188,7 @@ setup_mounts() {
         echo
 
         echo $(date) ": waiting for mount ..."
-        count=0
+        local count=0
         until mount -a; do
             if (( count++ >= 20 )); then
                 echo "$(date): failed to mount /home from $MAIN_INSTANCE_PRIVATE_IP after $count attempts" >&2
