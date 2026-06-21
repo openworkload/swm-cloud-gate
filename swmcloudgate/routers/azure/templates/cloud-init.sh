@@ -20,19 +20,15 @@ network = ipaddress.ip_interface(sys.argv[1]).network
 print(f"{network.network_address}/{network.netmask}")
 PY
 )
-    if [[ -z "$PRIVATE_SUBNET_CIDR" ]]; then
+if [[ -z "$PRIVATE_SUBNET_CIDR" ]]; then
     echo "$(date): could not determine private subnet CIDR" >&2
-        return 1
-    fi
+    return 1
+fi
 
-    if [[ "$IS_MAIN" == "true" ]]; then
-        MAIN_INSTANCE_PRIVATE_IP="${PRIVATE_IP_CIDR%%/*}"
-    fi
-
-    if [[ -z "$MAIN_INSTANCE_HOSTNAME" || -z "$MAIN_INSTANCE_PRIVATE_IP" ]]; then
-        echo "$(date): could not determine main instance details" >&2
-        return 1
-    fi
+if [[ -z "$MAIN_INSTANCE_HOSTNAME" || -z "$MAIN_INSTANCE_PRIVATE_IP" ]]; then
+    echo "$(date): could not determine main instance details" >&2
+    return 1
+fi
 }
 
 mount_azure_storage() {
@@ -162,7 +158,7 @@ setup_swm_worker() {
 }
 
 setup_network() {
-    detect_vm_context
+    detect_vm_context || exit 1
     GATEWAY_IP="${PRIVATE_IP_CIDR%%/*}"
     echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$GATEWAY_IP, master: ${IS_MAIN})"
     echo $GATEWAY_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
