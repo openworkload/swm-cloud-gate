@@ -517,7 +517,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         self.assertIn('echo "$MAIN_INSTANCE_PRIVATE_IP:/home /home nfs', cloud_init_script)
         self.assertNotIn("getent hosts", cloud_init_script)
         self.assertIn('echo "$(date): could not determine main instance details" >&2', cloud_init_script)
-        self.assertIn("count=0", cloud_init_script)
+        self.assertIn("local count=0", cloud_init_script)
         self.assertIn("until mount -a; do", cloud_init_script)
         self.assertIn("if (( count++ >= 20 )); then", cloud_init_script)
         self.assertIn(

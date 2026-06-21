@@ -1,6 +1,7 @@
 import os
 import json
 import copy
+import shlex
 import typing
 import logging
 
@@ -528,6 +529,7 @@ class AzureConnector(BaseConnector):
                 default=False,
             ),
         )
+        template_env.filters["shellquote"] = shlex.quote
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
         script: str = template.render(
             job_id=job_id,
