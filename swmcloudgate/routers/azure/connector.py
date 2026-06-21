@@ -1,9 +1,9 @@
 import os
 import json
 import copy
-import shlex
 import typing
 import logging
+import shlex
 
 import jinja2
 from azure.identity import CertificateCredential
@@ -523,11 +523,7 @@ class AzureConnector(BaseConnector):
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(
             loader=template_loader,
-            autoescape=jinja2.select_autoescape(
-                disabled_extensions=("sh",),
-                default_for_string=False,
-                default=False,
-            ),
+            autoescape=jinja2.select_autoescape(disabled_extensions=("sh",)),
         )
         template_env.filters["shellquote"] = shlex.quote
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
