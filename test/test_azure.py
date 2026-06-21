@@ -360,6 +360,20 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         with open("swmcloudgate/routers/azure/templates/partition.json") as template_file:
             return json.load(template_file)
 
+    def _render_cloud_init_script(self):
+        return self.connector._get_cloud_init_script(
+            job_id="job-1",
+            container_image="registry.example.org/image:tag",
+            container_registry="registry.example.org",
+            container_registry_username="user",
+            container_registry_password="pass",
+            storage_account="storageaccount",
+            storage_key="storagekey",
+            storage_container="storagecontainer",
+            runtime_params={"swm_source": "ssh"},
+            user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+        )
+
     def test_parse_vm_count_defaults_to_one_for_missing(self):
         self.assertEqual(self.connector._parse_vm_count(None), 1)
         self.assertEqual(self.connector._parse_vm_count(""), 1)
@@ -472,3 +486,19 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
             "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmNameMain'))]",
             compute_extension["dependsOn"],
         )
+
+    def test_cloud_init_script_detects_main_and_compute_vm_roles(self):
+        cloud_init_script = self._render_cloud_init_script()
+
+        self.assertIn('HOST_NAME="__SWM_HOST_NAME__"', cloud_init_script)
+        self.assertIn("IS_MAIN=__SWM_IS_MAIN__", cloud_init_script)
+        self.assertIn('MAIN_INSTANCE_HOSTNAME="__SWM_MAIN_INSTANCE_HOSTNAME__"', cloud_init_script)
+
+    def test_cloud_init_script_configures_nfs_for_shared_home_mount(self):
+        cloud_init_script = self._render_cloud_init_script()
+
+        self.assertIn("exportfs -ra", cloud_init_script)
+        self.assertIn("systemctl enable nfs-kernel-server", cloud_init_script)
+        self.assertIn('echo "$MAIN_INSTANCE_PRIVATE_IP:/home /home nfs', cloud_init_script)
+        self.assertNotIn("getent hosts", cloud_init_script)
+        self.assertIn('echo "$(date): could not determine main instance details" >&2', cloud_init_script)

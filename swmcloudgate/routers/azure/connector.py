@@ -22,6 +22,11 @@ TEMLPATE_FILE = "swmcloudgate/routers/azure/templates/partition.json"
 CLOUD_INIT_SCRIPT_FILE = "swmcloudgate/routers/azure/templates/cloud-init.sh"
 CLOUD_INIT_YAML = "swmcloudgate/routers/azure/templates/cloud-init.yaml"
 MAX_VM_COUNT = 32
+AZURE_NETWORK_API_VERSION = "2021-05-01"
+HOST_NAME_PLACEHOLDER = "__SWM_HOST_NAME__"
+IS_MAIN_PLACEHOLDER = "__SWM_IS_MAIN__"
+MAIN_INSTANCE_HOSTNAME_PLACEHOLDER = "__SWM_MAIN_INSTANCE_HOSTNAME__"
+MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER = "__SWM_MAIN_INSTANCE_PRIVATE_IP__"
 
 
 class AzureConnector(BaseConnector):
@@ -109,6 +114,7 @@ class AzureConnector(BaseConnector):
         )
         LOG.debug(f"Template parameters for job {job_id}: {template_parameters}")
         self._append_security_rules(ports, template)
+        self._configure_main_vm_custom_data(template)
         self._add_compute_vms(partition_name, vm_count, template)
         return {
             "properties": {
@@ -118,14 +124,51 @@ class AzureConnector(BaseConnector):
             }
         }
 
-    def _find_resource(self, resources: list[dict[str, typing.Any]], resource_type: str) -> dict[str, typing.Any] | None:
+    def _find_resource(
+        self, resources: list[dict[str, typing.Any]], resource_type: str
+    ) -> dict[str, typing.Any] | None:
         for resource in resources:
             if resource.get("type") == resource_type:
                 return resource
         return None
 
     def _find_vm_extension_resources(self, resources: list[dict[str, typing.Any]]) -> list[dict[str, typing.Any]]:
-        return [resource for resource in resources if resource.get("type") == "Microsoft.Compute/virtualMachines/extensions"]
+        return [
+            resource for resource in resources if resource.get("type") == "Microsoft.Compute/virtualMachines/extensions"
+        ]
+
+    def _get_main_vm_private_ip_expression(self) -> str:
+        return (
+            "reference(resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName')), "
+            f"'{AZURE_NETWORK_API_VERSION}').ipConfigurations[0].properties.privateIPAddress"
+        )
+
+    def _build_vm_custom_data(
+        self,
+        vm_name_expression: str,
+        is_main: bool,
+    ) -> str:
+        custom_data_expression = "parameters('cloudInitScript')"
+        replacements = (
+            (HOST_NAME_PLACEHOLDER, vm_name_expression),
+            (IS_MAIN_PLACEHOLDER, "'true'" if is_main else "'false'"),
+            (MAIN_INSTANCE_HOSTNAME_PLACEHOLDER, "parameters('vmNameMain')"),
+            (MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER, self._get_main_vm_private_ip_expression()),
+        )
+        for placeholder, replacement in replacements:
+            custom_data_expression = f"replace({custom_data_expression}, '{placeholder}', {replacement})"
+        return f"[base64({custom_data_expression})]"
+
+    def _configure_main_vm_custom_data(self, template: dict[str, typing.Any]) -> None:
+        resources = template.get("resources", [])
+        main_vm_resource = self._find_resource(resources, "Microsoft.Compute/virtualMachines")
+        if not main_vm_resource:
+            LOG.warning("Could not find main VM resource in template")
+            return
+        main_vm_resource["properties"]["osProfile"]["customData"] = self._build_vm_custom_data(
+            "parameters('vmNameMain')",
+            is_main=True,
+        )
 
     def _append_dependency(self, resource: dict[str, typing.Any], dependency: str) -> None:
         depends_on = resource.setdefault("dependsOn", [])
@@ -172,14 +215,20 @@ class AzureConnector(BaseConnector):
     ) -> dict[str, typing.Any]:
         compute_vm_resource = copy.deepcopy(main_vm_resource)
         compute_vm_resource["name"] = f"[format('{compute_vm_name}')]"
-        compute_vm_resource["properties"]["networkProfile"]["networkInterfaces"][0]["id"] = (
-            f"[resourceId('Microsoft.Network/networkInterfaces', '{compute_nic_name}')]"
-        )
+        compute_vm_resource["properties"]["networkProfile"]["networkInterfaces"][0][
+            "id"
+        ] = f"[resourceId('Microsoft.Network/networkInterfaces', '{compute_nic_name}')]"
         compute_vm_resource["properties"]["osProfile"]["computerName"] = f"[format('{compute_vm_name}')]"
+        compute_vm_resource["properties"]["osProfile"]["customData"] = self._build_vm_custom_data(
+            f"'{compute_vm_name}'",
+            is_main=False,
+        )
         compute_nic_dependency = f"[resourceId('Microsoft.Network/networkInterfaces', '{compute_nic_name}')]"
-        original_nic_dependency = "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
+        main_nic_dependency = "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
         self._append_dependency(compute_vm_resource, compute_nic_dependency)
-        self._remove_dependency(compute_vm_resource, original_nic_dependency)
+        self._remove_dependency(compute_vm_resource, main_nic_dependency)
+        # Compute nodes reference the main NIC in customData to receive the main private IP at deployment time.
+        self._append_dependency(compute_vm_resource, main_nic_dependency)
         return compute_vm_resource
 
     def _clone_compute_vm_extension(
@@ -487,6 +536,10 @@ class AzureConnector(BaseConnector):
             storage_account=storage_account,
             storage_key=storage_key,
             storage_container=storage_container,
+            host_name=HOST_NAME_PLACEHOLDER,
+            is_main=IS_MAIN_PLACEHOLDER,
+            main_instance_hostname=MAIN_INSTANCE_HOSTNAME_PLACEHOLDER,
+            main_instance_private_ip=MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER,
         )
         return script
 
