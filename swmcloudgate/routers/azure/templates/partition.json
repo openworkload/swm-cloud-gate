@@ -18,7 +18,6 @@
     },
     "vmNameMain": {
       "type": "string",
-      "defaultValue": "[format('{0}-main', parameters('resourcePrefix'))]",
       "metadata": {
         "description": "The main VM name."
       }
@@ -46,9 +45,15 @@
         "description": "SSH Key or password."
       }
     },
+    "storageKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Azure storage access key."
+      }
+    },
     "dnsLabelPrefix": {
       "type": "string",
-      "defaultValue": "[toLower(format('{0}-main', parameters('resourcePrefix')))]",
+      "defaultValue": "[toLower(parameters('vmNameMain'))]",
       "metadata": {
         "description": "Unique DNS Name for the Public IP used to access the VM."
       }
@@ -140,7 +145,7 @@
       "ssh": {
         "publicKeys": [
           {
-            "path": "/home/taras/.ssh/authorized_keys",
+          "path": "[format('/home/{0}/.ssh/authorized_keys', parameters('adminUsername'))]",
             "keyData": "[parameters('adminPasswordOrKey')]"
           }
         ]

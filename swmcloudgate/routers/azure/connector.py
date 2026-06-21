@@ -18,7 +18,7 @@ from swmcloudgate import cache
 from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
-TEMLPATE_FILE = "swmcloudgate/routers/azure/templates/partition.json"
+TEMPLATE_FILE = "swmcloudgate/routers/azure/templates/partition.json"
 CLOUD_INIT_SCRIPT_FILE = "swmcloudgate/routers/azure/templates/cloud-init.sh"
 CLOUD_INIT_YAML = "swmcloudgate/routers/azure/templates/cloud-init.yaml"
 MAX_VM_COUNT = 32
@@ -27,6 +27,7 @@ HOST_NAME_PLACEHOLDER = "__SWM_HOST_NAME__"
 IS_MAIN_PLACEHOLDER = "__SWM_IS_MAIN__"
 MAIN_INSTANCE_HOSTNAME_PLACEHOLDER = "__SWM_MAIN_INSTANCE_HOSTNAME__"
 MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER = "__SWM_MAIN_INSTANCE_PRIVATE_IP__"
+STORAGE_KEY_PLACEHOLDER = "__SWM_STORAGE_KEY__"
 
 
 class AzureConnector(BaseConnector):
@@ -97,11 +98,12 @@ class AzureConnector(BaseConnector):
         os_version: str,
         username: str,
         user_pub_key: str,
+        storage_key: str,
         cloud_init_script: str,
         ports: str,
         vm_count: int,
     ) -> dict[str, dict[str, typing.Any]]:
-        with open(TEMLPATE_FILE) as template_file:
+        with open(TEMPLATE_FILE) as template_file:
             template = json.load(template_file)
         template_parameters = self._get_template_parameters(
             job_id,
@@ -110,6 +112,7 @@ class AzureConnector(BaseConnector):
             os_version,
             username,
             user_pub_key,
+            storage_key,
             cloud_init_script,
         )
         LOG.debug(f"Template parameters for job {job_id}: {template_parameters}")
@@ -143,6 +146,9 @@ class AzureConnector(BaseConnector):
             f"'{AZURE_NETWORK_API_VERSION}').ipConfigurations[0].properties.privateIPAddress"
         )
 
+    def _get_main_vm_name(self, partition_name: str) -> str:
+        return f"{partition_name}-main"
+
     def _build_vm_custom_data(
         self,
         vm_name_expression: str,
@@ -154,6 +160,7 @@ class AzureConnector(BaseConnector):
             (IS_MAIN_PLACEHOLDER, "'true'" if is_main else "'false'"),
             (MAIN_INSTANCE_HOSTNAME_PLACEHOLDER, "parameters('vmNameMain')"),
             (MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER, self._get_main_vm_private_ip_expression()),
+            (STORAGE_KEY_PLACEHOLDER, "parameters('storageKey')"),
         )
         for placeholder, replacement in replacements:
             custom_data_expression = f"replace({custom_data_expression}, '{placeholder}', {replacement})"
@@ -226,7 +233,6 @@ class AzureConnector(BaseConnector):
         compute_nic_dependency = f"[resourceId('Microsoft.Network/networkInterfaces', '{compute_nic_name}')]"
         main_nic_dependency = "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
         self._append_dependency(compute_vm_resource, compute_nic_dependency)
-        self._remove_dependency(compute_vm_resource, main_nic_dependency)
         # Compute nodes reference the main NIC in customData to receive the main private IP at deployment time.
         self._append_dependency(compute_vm_resource, main_nic_dependency)
         return compute_vm_resource
@@ -323,6 +329,7 @@ class AzureConnector(BaseConnector):
         os_version: str,
         username: str,
         user_pub_key: str,
+        storage_key: str,
         cloud_init_script: str,
     ) -> dict[str, str]:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
@@ -333,8 +340,10 @@ class AzureConnector(BaseConnector):
         )
         return {
             "resourcePrefix": {"value": partition_name},
+            "vmNameMain": {"value": self._get_main_vm_name(partition_name)},
             "adminUsername": {"value": username},
             "adminPasswordOrKey": {"value": user_pub_key},
+            "storageKey": {"value": storage_key},
             "osVersion": {"value": os_version},
             "vmSize": {"value": flavor_name},
             "cloudInitScript": {"value": cloud_init_yaml},
@@ -517,13 +526,12 @@ class AzureConnector(BaseConnector):
         container_registry_username: str,
         container_registry_password: str,
         storage_account: str,
-        storage_key: str,
         storage_container: str,
         runtime_params: str,
         user_ssh_cert: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
-        template_env = jinja2.Environment(loader=template_loader, autoescape=True)
+        template_env = jinja2.Environment(loader=template_loader, autoescape=False)  # nosec B701
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
         script: str = template.render(
             job_id=job_id,
@@ -534,7 +542,7 @@ class AzureConnector(BaseConnector):
             container_registry_username=container_registry_username,
             container_registry_password=container_registry_password,
             storage_account=storage_account,
-            storage_key=storage_key,
+            storage_key=STORAGE_KEY_PLACEHOLDER,
             storage_container=storage_container,
             host_name=HOST_NAME_PLACEHOLDER,
             is_main=IS_MAIN_PLACEHOLDER,
@@ -542,6 +550,18 @@ class AzureConnector(BaseConnector):
             main_instance_private_ip=MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER,
         )
         return script
+
+    def _rollback_resource_group(self, resource_group_name: str) -> None:
+        LOG.warning(f"Rolling back failed deployment by deleting resource group {resource_group_name}")
+        try:
+            delete_operation = self._resource_client.resource_groups.begin_delete(resource_group_name)
+            if delete_operation:
+                if hasattr(delete_operation, "wait"):
+                    delete_operation.wait()
+                else:
+                    delete_operation.result()
+        except Exception as rollback_error:
+            LOG.error(f"Failed to roll back resource group {resource_group_name}: {rollback_error}")
 
     def get_resource_group(self, resource_group_name: str) -> typing.Dict[str, typing.Any]:
         if "resource_groups" in self._test_responses:
@@ -643,7 +663,6 @@ class AzureConnector(BaseConnector):
             container_registry_username,
             container_registry_password,
             storage_account,
-            storage_key,
             storage_container,
             runtime_params,
             user_ssh_cert,
@@ -657,6 +676,7 @@ class AzureConnector(BaseConnector):
             os_version,
             username,
             user_ssh_cert,
+            storage_key,
             cloud_init_script,
             ports,
             vm_count,
@@ -668,11 +688,23 @@ class AzureConnector(BaseConnector):
                 deployment_properties,
             )
         except HttpResponseError as e:
+            self._rollback_resource_group(resource_group_name)
             LOG.error(e)
             raise e
+        except Exception:
+            self._rollback_resource_group(resource_group_name)
+            raise
 
         LOG.info(f"Deploying resource group {resource_group_name}, deployment: {deployment_name}")
-        return deployment_async_operation.result(), resource_group_name
+        try:
+            return deployment_async_operation.result(), resource_group_name
+        except HttpResponseError as e:
+            self._rollback_resource_group(resource_group_name)
+            LOG.error(e)
+            raise e
+        except Exception:
+            self._rollback_resource_group(resource_group_name)
+            raise
 
     def delete_resource_group(self, resource_group_name: str) -> str | None:
         if "resource_groups" in self._test_responses:

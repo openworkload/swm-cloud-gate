@@ -41,9 +41,9 @@ mount_azure_storage() {
     apt-get install fuse3 blobfuse2 -y
     popd
 
-    local azure_storage_account={{ storage_account }}
-    local azure_storage_key={{ storage_key }}
-    local azure_storage_container={{ storage_container }}
+    local azure_storage_account="{{ storage_account }}"
+    local azure_storage_key="{{ storage_key }}"
+    local azure_storage_container="{{ storage_container }}"
 
     local config_file=/etc/blobfuse2.yaml
     local cache_dir=/tmp/blobfuse2.cache
@@ -90,6 +90,21 @@ EOF
     blobfuse2 mount $mount_dir --config-file=$config_file --read-only
 }
 
+wait_for_main_nfs() {
+    local attempt=0
+    local max_attempts=60
+
+    until timeout 2 bash -c "</dev/tcp/${MAIN_INSTANCE_PRIVATE_IP}/2049" >/dev/null 2>&1; do
+        (( attempt += 1 ))
+        if (( attempt >= max_attempts )); then
+            echo "$(date): NFS on ${MAIN_INSTANCE_PRIVATE_IP}:2049 did not become ready after ${max_attempts} attempts" >&2
+            return 1
+        fi
+        echo "$(date): waiting for NFS on ${MAIN_INSTANCE_PRIVATE_IP}:2049 (${attempt}/${max_attempts})"
+        sleep 5
+    done
+}
+
 create_directories() {
     if [[ "{{ swm_source }}" == "ssh" ]]; then
         echo $(date) ": create directory $SWM_ROOT"
@@ -132,7 +147,7 @@ setup_swm_worker() {
     elif [[ "{{ swm_source }}" == "http://*.tar.gz" ]]; then
         TMP_DIR=$(mktemp -d -t swm-worker-XXXXX)
         pushd $TMP_DIR
-        wget {{ swm_source }} --output-document=swm-worker.tar.gz
+        wget "{{ swm_source }}" --output-document=swm-worker.tar.gz
         mkdir -p /opt/swm
         tar zfx ./swm-worker.tar.gz --directory /opt/swm/
         popd
@@ -187,11 +202,21 @@ setup_mounts() {
         cat /etc/fstab
         echo
 
-        echo $(date) ": waiting for mount ..."
-        until mount -a || (( count++ >= 20 )); do sleep 5; done
-        echo $(date) ": mounted."
+        wait_for_main_nfs
 
-        systemctl restart docker # fix rare "connection closed" issues
+        local count=0
+        local max_mount_attempts=60
+        echo $(date) ": waiting for mount ..."
+        until mount -a; do
+            (( count += 1 ))
+            if (( count >= max_mount_attempts )); then
+                echo "$(date): failed to mount shared /home after ${max_mount_attempts} attempts" >&2
+                return 1
+            fi
+            echo "$(date): mount attempt ${count}/${max_mount_attempts} failed, retrying in 5 seconds"
+            sleep 5
+        done
+        echo $(date) ": mounted."
     fi
     echo
 
@@ -219,11 +244,11 @@ setup_docker() {
 pull_container_image() {
     if [ "{{ container_registry_password }}" != "" ]; then
         echo $(date) ": login to the registry: {{ container_registry }}"
-        docker login {{ container_registry }} --username {{ container_registry_username }} --password {{ container_registry_password }}
+        docker login "{{ container_registry }}" --username "{{ container_registry_username }}" --password "{{ container_registry_password }}"
     fi
 
     echo $(date) ": pull job container image from container registry: {{ container_image }}"
-    docker pull {{ container_image }}
+    docker pull "{{ container_image }}"
 
     echo $(date) ": all local docker images after the pulling:"
     docker images
