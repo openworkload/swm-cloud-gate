@@ -188,6 +188,7 @@ setup_mounts() {
         echo
 
         echo $(date) ": waiting for mount ..."
+        count=0
         until mount -a || (( count++ >= 20 )); do sleep 5; done
         echo $(date) ": mounted."
 

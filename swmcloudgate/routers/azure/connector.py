@@ -18,7 +18,7 @@ from swmcloudgate import cache
 from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
-TEMLPATE_FILE = "swmcloudgate/routers/azure/templates/partition.json"
+TEMPLATE_FILE = "swmcloudgate/routers/azure/templates/partition.json"
 CLOUD_INIT_SCRIPT_FILE = "swmcloudgate/routers/azure/templates/cloud-init.sh"
 CLOUD_INIT_YAML = "swmcloudgate/routers/azure/templates/cloud-init.yaml"
 MAX_VM_COUNT = 32
@@ -101,7 +101,7 @@ class AzureConnector(BaseConnector):
         ports: str,
         vm_count: int,
     ) -> dict[str, dict[str, typing.Any]]:
-        with open(TEMLPATE_FILE) as template_file:
+        with open(TEMPLATE_FILE) as template_file:
             template = json.load(template_file)
         template_parameters = self._get_template_parameters(
             job_id,
@@ -520,7 +520,7 @@ class AzureConnector(BaseConnector):
         user_ssh_cert: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
-        template_env = jinja2.Environment(loader=template_loader, autoescape=True)
+        template_env = jinja2.Environment(loader=template_loader, autoescape=False)
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
         script: str = template.render(
             job_id=job_id,
