@@ -19,12 +19,12 @@ resolve_main_instance_private_ip() {
             echo "$resolved_ip"
             return 0
         fi
-        echo "$(date): waiting for Azure DNS to resolve $MAIN_INSTANCE_HOSTNAME ..."
+        echo $(date) ": waiting for Azure DNS to resolve $MAIN_INSTANCE_HOSTNAME ..."
         attempts=$((attempts - 1))
         sleep 5
     done
 
-    echo "$(date): could not resolve $MAIN_INSTANCE_HOSTNAME" >&2
+    echo $(date) ": could not resolve $MAIN_INSTANCE_HOSTNAME" >&2
     return 1
 }
 
@@ -39,6 +39,10 @@ network = ipaddress.ip_interface(sys.argv[1]).network
 print(f"{network.network_address}/{network.netmask}")
 PY
 )
+    if [[ -z "$PRIVATE_SUBNET_CIDR" ]]; then
+        echo $(date) ": could not determine private subnet CIDR" >&2
+        return 1
+    fi
 
     if [[ "$HOST_NAME" == *-main ]]; then
         IS_MAIN=true
@@ -47,6 +51,10 @@ PY
     else
         MAIN_INSTANCE_HOSTNAME=$(echo "$HOST_NAME" | sed -E 's/-compute[0-9]+$/-main/')
         MAIN_INSTANCE_PRIVATE_IP=$(resolve_main_instance_private_ip)
+        if [[ -z "$MAIN_INSTANCE_PRIVATE_IP" ]]; then
+            echo $(date) ": could not determine main instance private IP" >&2
+            return 1
+        fi
     fi
 }
 

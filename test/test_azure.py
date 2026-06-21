@@ -503,3 +503,5 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         self.assertIn("systemctl enable nfs-kernel-server", cloud_init_script)
         self.assertIn('echo "$MAIN_INSTANCE_PRIVATE_IP:/home /home nfs', cloud_init_script)
         self.assertIn('resolved_ip=$(getent hosts "$MAIN_INSTANCE_HOSTNAME"', cloud_init_script)
+        self.assertIn('echo $(date) ": could not resolve $MAIN_INSTANCE_HOSTNAME" >&2', cloud_init_script)
+        self.assertIn('echo $(date) ": could not determine main instance private IP" >&2', cloud_init_script)
