@@ -223,9 +223,6 @@ class AzureConnector(BaseConnector):
             is_main=False,
         )
         compute_nic_dependency = f"[resourceId('Microsoft.Network/networkInterfaces', '{compute_nic_name}')]"
-        original_nic_dependency = (
-            "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
-        )
         self._append_dependency(compute_vm_resource, compute_nic_dependency)
         return compute_vm_resource
 

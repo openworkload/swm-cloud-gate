@@ -57,7 +57,9 @@ class TestAzureConnectorCustomData(unittest.TestCase):
 
         self.connector._configure_main_vm_custom_data(template)
 
-        main_vm = next(resource for resource in template["resources"] if resource["type"] == "Microsoft.Compute/virtualMachines")
+        main_vm = next(
+            resource for resource in template["resources"] if resource["type"] == "Microsoft.Compute/virtualMachines"
+        )
         custom_data = main_vm["properties"]["osProfile"]["customData"]
         self.assertIn("[base64(", custom_data)
         self.assertIn(f"'{HOST_NAME_PLACEHOLDER}'", custom_data)
@@ -65,7 +67,10 @@ class TestAzureConnectorCustomData(unittest.TestCase):
         self.assertIn(f"'{IS_MAIN_PLACEHOLDER}'", custom_data)
         self.assertIn("'true'", custom_data)
         self.assertIn(f"'{MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER}'", custom_data)
-        self.assertIn("reference(resourceId('Microsoft.Network/networkInterfaces'", custom_data)
+        self.assertIn(
+            "reference(resourceId('Microsoft.Network/networkInterfaces'",
+            custom_data,
+        )
 
     def test_compute_vm_custom_data_uses_explicit_main_private_ip_reference(self):
         template = self._load_template()
@@ -76,7 +81,8 @@ class TestAzureConnectorCustomData(unittest.TestCase):
         compute_vm = next(
             resource
             for resource in template["resources"]
-            if resource["type"] == "Microsoft.Compute/virtualMachines" and resource["name"] == "[format('part1-compute1')]"
+            if resource["type"] == "Microsoft.Compute/virtualMachines"
+            and resource["name"] == "[format('part1-compute1')]"
         )
         custom_data = compute_vm["properties"]["osProfile"]["customData"]
         self.assertIn(f"'{HOST_NAME_PLACEHOLDER}'", custom_data)
@@ -86,9 +92,11 @@ class TestAzureConnectorCustomData(unittest.TestCase):
         self.assertIn(f"'{MAIN_INSTANCE_HOSTNAME_PLACEHOLDER}'", custom_data)
         self.assertIn("parameters('vmNameMain')", custom_data)
         self.assertIn(f"'{MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER}'", custom_data)
-        self.assertIn("reference(resourceId('Microsoft.Network/networkInterfaces'", custom_data)
+        self.assertIn(
+            "reference(resourceId('Microsoft.Network/networkInterfaces'",
+            custom_data,
+        )
         self.assertIn(
             "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]",
             compute_vm["dependsOn"],
         )
-
