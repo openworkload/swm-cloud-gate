@@ -189,7 +189,13 @@ setup_mounts() {
 
         echo $(date) ": waiting for mount ..."
         count=0
-        until mount -a || (( count++ >= 20 )); do sleep 5; done
+        until mount -a; do
+            if (( count++ >= 20 )); then
+                echo "$(date): failed to mount /home from $MAIN_INSTANCE_PRIVATE_IP after $count attempts" >&2
+                return 1
+            fi
+            sleep 5
+        done
         echo $(date) ": mounted."
 
         systemctl restart docker # fix rare "connection closed" issues

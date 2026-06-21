@@ -225,7 +225,7 @@ class AzureConnector(BaseConnector):
         )
         compute_nic_dependency = f"[resourceId('Microsoft.Network/networkInterfaces', '{compute_nic_name}')]"
         self._append_dependency(compute_vm_resource, compute_nic_dependency)
-        # Compute nodes reference the main NIC in customData to receive the main private IP at deployment time.
+        # Compute nodes keep the inherited main NIC dependency because customData references its private IP.
         return compute_vm_resource
 
     def _clone_compute_vm_extension(

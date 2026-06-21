@@ -518,6 +518,13 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         self.assertNotIn("getent hosts", cloud_init_script)
         self.assertIn('echo "$(date): could not determine main instance details" >&2', cloud_init_script)
         self.assertIn("count=0", cloud_init_script)
+        self.assertIn("until mount -a; do", cloud_init_script)
+        self.assertIn("if (( count++ >= 20 )); then", cloud_init_script)
+        self.assertIn(
+            'echo "$(date): failed to mount /home from $MAIN_INSTANCE_PRIVATE_IP',
+            cloud_init_script,
+        )
+        self.assertIn("sleep 5", cloud_init_script)
 
     def test_cloud_init_script_keeps_shell_values_unescaped(self):
         cloud_init_script = self._render_cloud_init_script(
