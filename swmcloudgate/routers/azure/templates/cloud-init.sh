@@ -224,9 +224,11 @@ setup_docker() {
 }
 
 pull_container_image() {
-    if [ -n {{ container_registry_password | shellquote }} ]; then
+    local container_registry_password={{ container_registry_password | shellquote }}
+
+    if [ -n "$container_registry_password" ]; then
         echo $(date) ": login to the registry: {{ container_registry | shellquote }}"
-        docker login {{ container_registry | shellquote }} --username {{ container_registry_username | shellquote }} --password {{ container_registry_password | shellquote }}
+        docker login {{ container_registry | shellquote }} --username {{ container_registry_username | shellquote }} --password "$container_registry_password"
     fi
 
     echo $(date) ": pull job container image from container registry: {{ container_image | shellquote }}"

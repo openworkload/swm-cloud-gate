@@ -413,9 +413,17 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
 
         self.connector._add_compute_vms("part1", 3, template)
 
-        network_interfaces = [r for r in template["resources"] if r["type"] == "Microsoft.Network/networkInterfaces"]
-        virtual_machines = [r for r in template["resources"] if r["type"] == "Microsoft.Compute/virtualMachines"]
-        extensions = [r for r in template["resources"] if r["type"] == "Microsoft.Compute/virtualMachines/extensions"]
+        network_interfaces = [
+            resource for resource in template["resources"] if resource["type"] == "Microsoft.Network/networkInterfaces"
+        ]
+        virtual_machines = [
+            resource for resource in template["resources"] if resource["type"] == "Microsoft.Compute/virtualMachines"
+        ]
+        extensions = [
+            resource
+            for resource in template["resources"]
+            if resource["type"] == "Microsoft.Compute/virtualMachines/extensions"
+        ]
 
         self.assertEqual(len(network_interfaces), 3)
         self.assertEqual(len(virtual_machines), 3)
@@ -532,7 +540,8 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         )
 
         self.assertIn("pa&ss<word>", cloud_init_script)
-        self.assertIn("--password 'pa&ss<word>'", cloud_init_script)
+        self.assertIn("local container_registry_password='pa&ss<word>'", cloud_init_script)
+        self.assertIn('--password "$container_registry_password"', cloud_init_script)
         self.assertNotIn("pa&amp;ss&lt;word&gt;", cloud_init_script)
 
     def test_cloud_init_script_quotes_storage_key(self):
