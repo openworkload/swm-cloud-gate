@@ -24,8 +24,11 @@
     },
     "adminUsername": {
       "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "allowedPattern": "^[a-z][a-z0-9_-]*$",
       "metadata": {
-        "description": "Admin username for all VMs."
+        "description": "Admin username for all VMs. Restricted to Linux-compatible usernames to avoid invalid authorized_keys paths and deployment failures."
       }
     },
     "authenticationType": {

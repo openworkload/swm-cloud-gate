@@ -3,6 +3,7 @@ import json
 import copy
 import typing
 import logging
+import shlex
 
 import jinja2
 from azure.identity import CertificateCredential
@@ -27,7 +28,7 @@ HOST_NAME_PLACEHOLDER = "__SWM_HOST_NAME__"
 IS_MAIN_PLACEHOLDER = "__SWM_IS_MAIN__"
 MAIN_INSTANCE_HOSTNAME_PLACEHOLDER = "__SWM_MAIN_INSTANCE_HOSTNAME__"
 MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER = "__SWM_MAIN_INSTANCE_PRIVATE_IP__"
-STORAGE_KEY_PLACEHOLDER = "__SWM_STORAGE_KEY__"
+STORAGE_KEY_B64_PLACEHOLDER = "__SWM_STORAGE_KEY_B64__"
 
 
 class AzureConnector(BaseConnector):
@@ -160,7 +161,7 @@ class AzureConnector(BaseConnector):
             (IS_MAIN_PLACEHOLDER, "'true'" if is_main else "'false'"),
             (MAIN_INSTANCE_HOSTNAME_PLACEHOLDER, "parameters('vmNameMain')"),
             (MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER, self._get_main_vm_private_ip_expression()),
-            (STORAGE_KEY_PLACEHOLDER, "parameters('storageKey')"),
+            (STORAGE_KEY_B64_PLACEHOLDER, "base64(parameters('storageKey'))"),
         )
         for placeholder, replacement in replacements:
             custom_data_expression = f"replace({custom_data_expression}, '{placeholder}', {replacement})"
@@ -531,7 +532,10 @@ class AzureConnector(BaseConnector):
         user_ssh_cert: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
-        template_env = jinja2.Environment(loader=template_loader, autoescape=False)  # nosec B701
+        template_env = jinja2.Environment(  # nosec B701 - shellquote secures interpolated shell values here
+            loader=template_loader, autoescape=False
+        )
+        template_env.filters["shellquote"] = shlex.quote
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
         script: str = template.render(
             job_id=job_id,
@@ -542,7 +546,7 @@ class AzureConnector(BaseConnector):
             container_registry_username=container_registry_username,
             container_registry_password=container_registry_password,
             storage_account=storage_account,
-            storage_key=STORAGE_KEY_PLACEHOLDER,
+            storage_key_b64=STORAGE_KEY_B64_PLACEHOLDER,
             storage_container=storage_container,
             host_name=HOST_NAME_PLACEHOLDER,
             is_main=IS_MAIN_PLACEHOLDER,
@@ -556,10 +560,7 @@ class AzureConnector(BaseConnector):
         try:
             delete_operation = self._resource_client.resource_groups.begin_delete(resource_group_name)
             if delete_operation:
-                if hasattr(delete_operation, "wait"):
-                    delete_operation.wait()
-                else:
-                    delete_operation.result()
+                delete_operation.result()
         except Exception as rollback_error:
             LOG.error(f"Failed to roll back resource group {resource_group_name}: {rollback_error}")
 

@@ -1,5 +1,6 @@
 import json
 import os
+import shlex
 import unittest
 
 from swmcloudgate.routers.azure.connector import (
@@ -8,7 +9,7 @@ from swmcloudgate.routers.azure.connector import (
     IS_MAIN_PLACEHOLDER,
     MAIN_INSTANCE_HOSTNAME_PLACEHOLDER,
     MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER,
-    STORAGE_KEY_PLACEHOLDER,
+    STORAGE_KEY_B64_PLACEHOLDER,
 )
 
 
@@ -41,6 +42,7 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
 
     def test_cloud_init_script_uses_explicit_main_instance_placeholders(self):
         cloud_init_script = self._render_cloud_init_script()
+        expected_password = shlex.quote("user<&>\"'pass")
 
         self.assertIn(f'HOST_NAME="{HOST_NAME_PLACEHOLDER}"', cloud_init_script)
         self.assertIn(f"IS_MAIN={IS_MAIN_PLACEHOLDER}", cloud_init_script)
@@ -52,13 +54,18 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             f'MAIN_INSTANCE_PRIVATE_IP="{MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER}"',
             cloud_init_script,
         )
-        self.assertIn(f'local azure_storage_key="{STORAGE_KEY_PLACEHOLDER}"', cloud_init_script)
+        self.assertIn(f'local azure_storage_key_b64="{STORAGE_KEY_B64_PLACEHOLDER}"', cloud_init_script)
+        self.assertIn("azure_storage_key=$(printf '%s' \"$azure_storage_key_b64\" | base64 -d)", cloud_init_script)
         self.assertIn(
-            'docker login "registry.example.org" --username "user" --password "user<&>"\'pass"',
+            f"docker login registry.example.org --username user --password {expected_password}",
+            cloud_init_script,
+        )
+        self.assertNotIn(
+            "docker login registry.example.org --username user --password user<&>\"'pass",
             cloud_init_script,
         )
         self.assertIn(
-            'echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC== user@example" >> /root/.ssh/authorized_keys',
+            "echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC== user@example' >> /root/.ssh/authorized_keys",
             cloud_init_script,
         )
         self.assertNotIn("&lt;", cloud_init_script)
@@ -88,7 +95,7 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             "reference(resourceId('Microsoft.Network/networkInterfaces'",
             custom_data,
         )
-        self.assertIn("parameters('storageKey')", custom_data)
+        self.assertIn("base64(parameters('storageKey'))", custom_data)
 
     def test_compute_vm_custom_data_uses_explicit_main_private_ip_reference(self):
         template = self._load_template()
@@ -114,7 +121,7 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             "reference(resourceId('Microsoft.Network/networkInterfaces'",
             custom_data,
         )
-        self.assertIn("parameters('storageKey')", custom_data)
+        self.assertIn("base64(parameters('storageKey'))", custom_data)
         self.assertIn(
             "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]",
             compute_vm["dependsOn"],

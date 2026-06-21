@@ -88,7 +88,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         nic_properties = compute_nic["properties"]["ipConfigurations"][0]["properties"]
         self.assertNotIn("publicIPAddress", nic_properties)
 
-    def test_compute_vm_dependencies_include_main_and_compute_nics(self):
+    def test_compute_vm_preserves_main_nic_dependency_and_adds_compute_nic(self):
         template = self._load_template()
 
         self.connector._add_compute_vms("part1", 2, template)
@@ -222,7 +222,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         )
 
         main_vm = next(resource for resource in virtual_machines if resource["name"] == "[parameters('vmNameMain')]")
-        self.assertIn("parameters('storageKey')", main_vm["properties"]["osProfile"]["customData"])
+        self.assertIn("base64(parameters('storageKey'))", main_vm["properties"]["osProfile"]["customData"])
 
     def test_create_deployment_rolls_back_resource_group_on_failure(self):
         self.connector._test_responses = {}
@@ -259,4 +259,4 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
             )
 
         self.connector._resource_client.resource_groups.begin_delete.assert_called_once_with("part1-resource-group")
-        delete_operation.wait.assert_called_once()
+        delete_operation.result.assert_called_once()
