@@ -524,13 +524,12 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
             container_registry_password="pa&ss<word>",
         )
 
-        self.assertIn('pa&ss<word>', cloud_init_script)
+        self.assertIn("pa&ss<word>", cloud_init_script)
         self.assertNotIn("pa&amp;ss&lt;word&gt;", cloud_init_script)
 
     def test_template_uses_admin_username_for_authorized_keys_path(self):
         template = self._load_template()
-        main_vm = next(resource for resource in template["resources"] if resource["type"] == "Microsoft.Compute/virtualMachines")
-        authorized_key_path = main_vm["properties"]["osProfile"]["linuxConfiguration"]["ssh"]["publicKeys"][0]["path"]
+        authorized_key_path = template["variables"]["linuxConfiguration"]["ssh"]["publicKeys"][0]["path"]
 
         self.assertEqual(
             authorized_key_path,

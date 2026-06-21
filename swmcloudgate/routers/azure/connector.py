@@ -520,7 +520,14 @@ class AzureConnector(BaseConnector):
         user_ssh_cert: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
-        template_env = jinja2.Environment(loader=template_loader, autoescape=False)
+        template_env = jinja2.Environment(
+            loader=template_loader,
+            autoescape=jinja2.select_autoescape(
+                disabled_extensions=("sh",),
+                default_for_string=False,
+                default=False,
+            ),
+        )
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
         script: str = template.render(
             job_id=job_id,
