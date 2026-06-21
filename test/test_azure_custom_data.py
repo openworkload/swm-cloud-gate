@@ -11,7 +11,7 @@ from swmcloudgate.routers.azure.connector import (
 )
 
 
-class TestAzureConnectorCustomData(unittest.TestCase):
+class TestAzureConnectorCustomDataInjection(unittest.TestCase):
     _test_config = "test/data/responses.json"
 
     def setUp(self):

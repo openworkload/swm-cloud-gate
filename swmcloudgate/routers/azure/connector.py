@@ -226,6 +226,7 @@ class AzureConnector(BaseConnector):
         main_nic_dependency = "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
         self._append_dependency(compute_vm_resource, compute_nic_dependency)
         self._remove_dependency(compute_vm_resource, main_nic_dependency)
+        # Compute nodes reference the main NIC in customData to receive the main private IP at deployment time.
         self._append_dependency(compute_vm_resource, main_nic_dependency)
         return compute_vm_resource
 
