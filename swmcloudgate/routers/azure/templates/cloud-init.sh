@@ -159,9 +159,9 @@ setup_swm_worker() {
 
 setup_network() {
     detect_vm_context || exit 1
-    GATEWAY_IP="${PRIVATE_IP_CIDR%%/*}"
-    echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$GATEWAY_IP, master: ${IS_MAIN})"
-    echo $GATEWAY_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
+    VM_PRIVATE_IP="${PRIVATE_IP_CIDR%%/*}"
+    echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$VM_PRIVATE_IP, master: ${IS_MAIN})"
+    echo $VM_PRIVATE_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
     echo $(date) ": /etc/hosts:"
     cat /etc/hosts
     echo
