@@ -108,16 +108,16 @@ wait_for_main_nfs() {
 }
 
 create_directories() {
-    if [[ "{{ swm_source }}" == "ssh" ]]; then
+    if [[ {{ swm_source | shellquote }} == "ssh" ]]; then
         echo $(date) ": create directory $SWM_ROOT"
         mkdir -p "$SWM_ROOT"
     fi
 }
 
 setup_swm_worker() {
-    echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source }}"
+    echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source | shellquote }}"
 
-    if [[ "{{ swm_source }}" == "ssh" ]]; then
+    if [[ {{ swm_source | shellquote }} == "ssh" ]]; then
         echo {{ ssh_pub_key | shellquote }} >> /root/.ssh/authorized_keys
         echo $(date) ": ensure swm worker is installed via ssh"
 
@@ -146,7 +146,7 @@ setup_swm_worker() {
 
         ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py -v ${SWM_VERSION} -p ${SWM_ROOT} -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup.config
 
-    elif [[ "{{ swm_source }}" == "http://*.tar.gz" ]]; then
+    elif [[ {{ swm_source | shellquote }} == "http://*.tar.gz" ]]; then
         TMP_DIR=$(mktemp -d -t swm-worker-XXXXX)
         pushd $TMP_DIR
         wget {{ swm_source | shellquote }} --output-document=swm-worker.tar.gz
@@ -244,13 +244,18 @@ setup_docker() {
 }
 
 pull_container_image() {
-    if [ "{{ container_registry_password }}" != "" ]; then
-        echo $(date) ": login to the registry: {{ container_registry }}"
-        docker login {{ container_registry | shellquote }} --username {{ container_registry_username | shellquote }} --password {{ container_registry_password | shellquote }}
+    local container_registry={{ container_registry | shellquote }}
+    local container_registry_username={{ container_registry_username | shellquote }}
+    local container_registry_password={{ container_registry_password | shellquote }}
+    local container_image={{ container_image | shellquote }}
+
+    if [ -n "$container_registry_password" ]; then
+        echo $(date) ": login to the registry: $container_registry"
+        docker login "$container_registry" --username "$container_registry_username" --password "$container_registry_password"
     fi
 
-    echo $(date) ": pull job container image from container registry: {{ container_image }}"
-    docker pull {{ container_image | shellquote }}
+    echo $(date) ": pull job container image from container registry: $container_image"
+    docker pull "$container_image"
 
     echo $(date) ": all local docker images after the pulling:"
     docker images

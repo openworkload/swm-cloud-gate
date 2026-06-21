@@ -18,17 +18,29 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         with open("swmcloudgate/routers/azure/templates/partition.json") as template_file:
             return json.load(template_file)
 
-    def _render_cloud_init_script(self):
+    def _render_cloud_init_script(self, **overrides):
+        params = {
+            "job_id": "job-1",
+            "container_image": "registry.example.org/image:tag",
+            "container_registry": "registry.example.org",
+            "container_registry_username": "user",
+            "container_registry_password": "pass",
+            "storage_account": "storageaccount",
+            "storage_container": "storagecontainer",
+            "runtime_params": {"swm_source": "ssh"},
+            "user_ssh_cert": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+        }
+        params.update(overrides)
         return self.connector._get_cloud_init_script(
-            job_id="job-1",
-            container_image="registry.example.org/image:tag",
-            container_registry="registry.example.org",
-            container_registry_username="user",
-            container_registry_password="pass",
-            storage_account="storageaccount",
-            storage_container="storagecontainer",
-            runtime_params={"swm_source": "ssh"},
-            user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+            job_id=params["job_id"],
+            container_image=params["container_image"],
+            container_registry=params["container_registry"],
+            container_registry_username=params["container_registry_username"],
+            container_registry_password=params["container_registry_password"],
+            storage_account=params["storage_account"],
+            storage_container=params["storage_container"],
+            runtime_params=params["runtime_params"],
+            user_ssh_cert=params["user_ssh_cert"],
         )
 
     def test_parse_vm_count_defaults_to_one_for_missing(self):
@@ -173,6 +185,21 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         self.assertNotIn("getent hosts", cloud_init_script)
         self.assertIn('echo "$(date): could not determine main instance details" >&2', cloud_init_script)
 
+    def test_cloud_init_script_quotes_shell_special_characters(self):
+        cloud_init_script = self._render_cloud_init_script(
+            container_registry_password="pa&ss<word>",
+        )
+
+        self.assertIn("pa&ss<word>", cloud_init_script)
+        self.assertIn("local container_registry_password='pa&ss<word>'", cloud_init_script)
+        self.assertIn('if [ -n "$container_registry_password" ]; then', cloud_init_script)
+        self.assertIn(
+            'docker login "$container_registry" --username "$container_registry_username" --password "$container_registry_password"',
+            cloud_init_script,
+        )
+        self.assertIn('docker pull "$container_image"', cloud_init_script)
+        self.assertNotIn("pa&amp;ss&lt;word&gt;", cloud_init_script)
+
     def test_create_deployment_builds_multi_node_template(self):
         self.connector._test_responses = {}
         self.connector._subscription_id = "test-subscription"
@@ -218,7 +245,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         self.assertNotIn("storagekey", parameters["cloudInitScript"]["value"])
         self.assertEqual(
             template["variables"]["linuxConfiguration"]["ssh"]["publicKeys"][0]["path"],
-            "[format('/home/{0}/.ssh/authorized_keys', parameters('adminUsername'))]",
+            "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]",
         )
 
         main_vm = next(resource for resource in virtual_machines if resource["name"] == "[parameters('vmNameMain')]")

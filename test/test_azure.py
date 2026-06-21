@@ -5,10 +5,9 @@ from multiprocessing import Process
 
 import aiohttp
 import uvicorn
-import asynctest
 
 
-class TestAzureGate(asynctest.TestCase):
+class TestAzureGate(unittest.IsolatedAsyncioTestCase):
 
     _hostname: str = socket.gethostname()
     _port: int = 8445
@@ -20,7 +19,7 @@ class TestAzureGate(asynctest.TestCase):
         "extra": "location=test",
     }
 
-    async def setUp(self):
+    async def asyncSetUp(self):
         self.maxDiff = None
         os.environ["SWM_TEST_CONFIG"] = "test/data/responses.json"
         # Point routers at a test cloud-gate.yaml that provides non-empty
@@ -45,7 +44,7 @@ class TestAzureGate(asynctest.TestCase):
         await asyncio.sleep(0.5)  # time for the server to start
         self.assertTrue(self.proc.is_alive())
 
-    async def tearDown(self):
+    async def asyncTearDown(self):
         self.assertTrue(self.proc.is_alive())
         self.proc.terminate()
 
