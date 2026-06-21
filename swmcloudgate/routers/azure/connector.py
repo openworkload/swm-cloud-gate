@@ -22,6 +22,7 @@ TEMLPATE_FILE = "swmcloudgate/routers/azure/templates/partition.json"
 CLOUD_INIT_SCRIPT_FILE = "swmcloudgate/routers/azure/templates/cloud-init.sh"
 CLOUD_INIT_YAML = "swmcloudgate/routers/azure/templates/cloud-init.yaml"
 MAX_VM_COUNT = 32
+AZURE_NETWORK_API_VERSION = "2021-05-01"
 HOST_NAME_PLACEHOLDER = "__SWM_HOST_NAME__"
 IS_MAIN_PLACEHOLDER = "__SWM_IS_MAIN__"
 MAIN_INSTANCE_HOSTNAME_PLACEHOLDER = "__SWM_MAIN_INSTANCE_HOSTNAME__"
@@ -139,7 +140,7 @@ class AzureConnector(BaseConnector):
     def _get_main_vm_private_ip_expression(self) -> str:
         return (
             "reference(resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName')), "
-            "'2021-05-01').ipConfigurations[0].properties.privateIPAddress"
+            f"'{AZURE_NETWORK_API_VERSION}').ipConfigurations[0].properties.privateIPAddress"
         )
 
     def _build_vm_custom_data(
