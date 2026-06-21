@@ -532,6 +532,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         )
 
         self.assertIn("pa&ss<word>", cloud_init_script)
+        self.assertIn("--password 'pa&ss<word>'", cloud_init_script)
         self.assertNotIn("pa&amp;ss&lt;word&gt;", cloud_init_script)
 
     def test_template_uses_admin_username_for_authorized_keys_path(self):
