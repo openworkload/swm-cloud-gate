@@ -535,6 +535,14 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         self.assertIn("--password 'pa&ss<word>'", cloud_init_script)
         self.assertNotIn("pa&amp;ss&lt;word&gt;", cloud_init_script)
 
+    def test_cloud_init_script_quotes_storage_key(self):
+        cloud_init_script = self._render_cloud_init_script(
+            storage_key="sto<rage&key\"'",
+        )
+
+        self.assertIn("local azure_storage_key='sto<rage&key\"'\"'\"''", cloud_init_script)
+        self.assertNotIn("sto&lt;rage&amp;key", cloud_init_script)
+
     def test_template_uses_admin_username_for_authorized_keys_path(self):
         template = self._load_template()
         authorized_key_path = template["variables"]["linuxConfiguration"]["ssh"]["publicKeys"][0]["path"]

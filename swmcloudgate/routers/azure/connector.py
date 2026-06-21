@@ -226,7 +226,7 @@ class AzureConnector(BaseConnector):
         )
         compute_nic_dependency = f"[resourceId('Microsoft.Network/networkInterfaces', '{compute_nic_name}')]"
         self._append_dependency(compute_vm_resource, compute_nic_dependency)
-        # Compute nodes keep the inherited main NIC dependency because customData references its private IP.
+        # The cloned VM keeps the inherited main NIC dependency because customData references its private IP.
         return compute_vm_resource
 
     def _clone_compute_vm_extension(
@@ -523,7 +523,11 @@ class AzureConnector(BaseConnector):
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(
             loader=template_loader,
-            autoescape=jinja2.select_autoescape(disabled_extensions=("sh",)),
+            autoescape=jinja2.select_autoescape(
+                disabled_extensions=("sh",),
+                default_for_string=False,
+                default=False,
+            ),
         )
         template_env.filters["shellquote"] = shlex.quote
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)

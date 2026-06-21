@@ -224,7 +224,7 @@ setup_docker() {
 }
 
 pull_container_image() {
-    if [ {{ container_registry_password | shellquote }} != "" ]; then
+    if [ -n {{ container_registry_password | shellquote }} ]; then
         echo $(date) ": login to the registry: {{ container_registry | shellquote }}"
         docker login {{ container_registry | shellquote }} --username {{ container_registry_username | shellquote }} --password {{ container_registry_password | shellquote }}
     fi
