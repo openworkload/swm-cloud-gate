@@ -7,6 +7,8 @@ packages:
   - docker.io
   - cgroupfs-mount
   - net-tools
+  - nfs-common
+  - nfs-kernel-server
 #  - blobfuse2
 
 write_files:
