@@ -1,34 +1,15 @@
 #!/bin/bash -ex
 
-HOST_NAME=$(hostname)
+HOST_NAME="{{ host_name }}"
 SWM_ROOT="/opt/swm"
 PRIMARY_INTERFACE=""
 PRIVATE_IP_CIDR=""
 PRIVATE_SUBNET_CIDR=""
-IS_MAIN=false
-MAIN_INSTANCE_HOSTNAME=""
-MAIN_INSTANCE_PRIVATE_IP=""
+IS_MAIN={{ is_main }}
+MAIN_INSTANCE_HOSTNAME="{{ main_instance_hostname }}"
+MAIN_INSTANCE_PRIVATE_IP="{{ main_instance_private_ip }}"
 
-resolve_main_instance_private_ip() {
-    local attempts=20
-
-    while (( attempts > 0 )); do
-        local resolved_ip
-        resolved_ip=$(getent hosts "$MAIN_INSTANCE_HOSTNAME" | awk 'NR==1 { print $1 }')
-        if [[ -n "$resolved_ip" ]]; then
-            echo "$resolved_ip"
-            return 0
-        fi
-        echo $(date) ": waiting for Azure DNS to resolve $MAIN_INSTANCE_HOSTNAME ..."
-        attempts=$((attempts - 1))
-        sleep 5
-    done
-
-    echo $(date) ": could not resolve $MAIN_INSTANCE_HOSTNAME" >&2
-    return 1
-}
-
-detect_vm_role() {
+detect_vm_context() {
     PRIMARY_INTERFACE=$(ip -4 route list 0/0 | awk 'NR==1 { print $5 }')
     PRIVATE_IP_CIDR=$(ip -4 -o addr show "$PRIMARY_INTERFACE" | awk 'NR==1 { print $4 }')
     PRIVATE_SUBNET_CIDR=$(python3 - "$PRIVATE_IP_CIDR" <<'PY'
@@ -44,17 +25,13 @@ PY
         return 1
     fi
 
-    if [[ "$HOST_NAME" == *-main ]]; then
-        IS_MAIN=true
-        MAIN_INSTANCE_HOSTNAME="$HOST_NAME"
+    if [[ "$IS_MAIN" == "true" ]]; then
         MAIN_INSTANCE_PRIVATE_IP="${PRIVATE_IP_CIDR%%/*}"
-    else
-        MAIN_INSTANCE_HOSTNAME=$(echo "$HOST_NAME" | sed -E 's/-compute[0-9]+$/-main/')
-        MAIN_INSTANCE_PRIVATE_IP=$(resolve_main_instance_private_ip)
-        if [[ -z "$MAIN_INSTANCE_PRIVATE_IP" ]]; then
-            echo $(date) ": could not determine main instance private IP" >&2
-            return 1
-        fi
+    fi
+
+    if [[ -z "$MAIN_INSTANCE_HOSTNAME" || -z "$MAIN_INSTANCE_PRIVATE_IP" ]]; then
+        echo $(date) ": could not determine main instance details" >&2
+        return 1
     fi
 }
 
@@ -185,7 +162,7 @@ setup_swm_worker() {
 }
 
 setup_network() {
-    detect_vm_role
+    detect_vm_context
     GATEWAY_IP="${PRIVATE_IP_CIDR%%/*}"
     echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$GATEWAY_IP, master: ${IS_MAIN})"
     echo $GATEWAY_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
