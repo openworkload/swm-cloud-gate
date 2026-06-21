@@ -127,6 +127,9 @@ async def create_partition(
 
             return {"error": f"Error from Azure: {'; '.join(error_messages)}", "partition": partition}
 
+    except ValueError as e:
+        raise HTTPException(status_code=http.HTTPStatus.BAD_REQUEST, detail=str(e)) from e
+
     except Exception as e:
         LOG.error(traceback.format_exception(e))
         return {"error": traceback.format_exception(e)}

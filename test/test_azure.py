@@ -422,7 +422,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         nic_properties = compute_nic["properties"]["ipConfigurations"][0]["properties"]
         self.assertNotIn("publicIPAddress", nic_properties)
 
-    def test_compute_vm_dependencies_preserve_original_and_use_compute_nic(self):
+    def test_compute_vm_dependencies_include_compute_and_main_nics(self):
         template = self._load_template()
 
         self.connector._add_compute_vms("part1", 2, template)
@@ -437,7 +437,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
             "[resourceId('Microsoft.Network/networkInterfaces', 'part1-compute1-NetInt')]",
             compute_vm["dependsOn"],
         )
-        self.assertNotIn(
+        self.assertIn(
             "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]",
             compute_vm["dependsOn"],
         )
