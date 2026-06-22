@@ -532,7 +532,7 @@ class AzureConnector(BaseConnector):
         container_registry_password: str,
         storage_account: str,
         storage_container: str,
-        runtime_params: str,
+        runtime_params: dict[str, str],
         user_ssh_cert: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
