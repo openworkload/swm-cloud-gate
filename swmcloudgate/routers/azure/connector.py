@@ -116,7 +116,11 @@ class AzureConnector(BaseConnector):
             storage_key,
             cloud_init_script,
         )
-        LOG.debug(f"Template parameters for job {job_id}: {template_parameters}")
+        sanitized_parameters = copy.deepcopy(template_parameters)
+        for secret_key in ("adminPasswordOrKey", "storageKey"):
+            if secret_key in sanitized_parameters:
+                sanitized_parameters[secret_key]["value"] = "***"
+        LOG.debug(f"Template parameters for job {job_id}: {sanitized_parameters}")
         self._append_security_rules(ports, template)
         self._configure_main_vm_custom_data(template)
         self._add_compute_vms(partition_name, vm_count, template)
