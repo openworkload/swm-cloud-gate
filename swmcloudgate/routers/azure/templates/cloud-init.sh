@@ -252,7 +252,6 @@ pull_container_image() {
     if [ -n "$container_registry_password" ]; then
         echo $(date) ": login to the registry: $container_registry"
         docker login "$container_registry" --username "$container_registry_username" --password "$container_registry_password"
-        docker login {{ container_registry | shellquote }} --username {{ container_registry_username | shellquote }} --password {{ container_registry_password | shellquote }}
     fi
 
     echo $(date) ": pull job container image from container registry: $container_image"
