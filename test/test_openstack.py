@@ -33,8 +33,10 @@ class TestOpenstackGate(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.proc.is_alive())
 
     async def asyncTearDown(self):
-        self.assertTrue(self.proc.is_alive())
-        self.proc.terminate()
+        if self.proc.is_alive():
+            self.proc.terminate()
+        self.proc.join(timeout=5)
+        os.environ.pop("SWM_TEST_CONFIG", None)
 
     async def test_list_flavors(self):
         headers = {

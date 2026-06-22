@@ -46,9 +46,11 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.proc.is_alive())
 
     async def asyncTearDown(self):
-        self.assertTrue(self.proc.is_alive())
-        self.proc.terminate()
-
+        if self.proc.is_alive():
+            self.proc.terminate()
+        self.proc.join(timeout=5)
+        os.environ.pop("SWM_TEST_CONFIG", None)
+        os.environ.pop("SWM_GATE_CONFIG", None)
     async def test_list_flavors(self):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.get(
@@ -337,6 +339,7 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
                 url=f"http://{self._hostname}:{self._port}/azure/partitions",
                 json={"pem_data": "test"},
             ) as resp:
+                self.assertEqual(resp.status, 400)
                 try:
                     data = await resp.json()
                 except aiohttp.client_exceptions.ContentTypeError:

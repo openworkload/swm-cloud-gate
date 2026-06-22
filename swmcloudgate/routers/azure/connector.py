@@ -76,7 +76,7 @@ class AzureConnector(BaseConnector):
             )
             raise Exception(msg)
 
-    def _parse_vm_count(self, count_param: str) -> int:
+    def _parse_vm_count(self, count_param: str | None) -> int:
         """Parse and validate VM count parameter."""
         if count_param is None or count_param == "":
             return 1
