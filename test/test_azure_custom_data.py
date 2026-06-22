@@ -57,7 +57,11 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
         self.assertIn(f'local azure_storage_key_b64="{STORAGE_KEY_B64_PLACEHOLDER}"', cloud_init_script)
         self.assertIn("azure_storage_key=$(printf '%s' \"$azure_storage_key_b64\" | base64 -d)", cloud_init_script)
         self.assertIn(
-            f"docker login registry.example.org --username user --password {expected_password}",
+            f"local container_registry_password={expected_password}",
+            cloud_init_script,
+        )
+        self.assertIn(
+            'docker login "$container_registry" --username "$container_registry_username" --password "$container_registry_password"',
             cloud_init_script,
         )
         self.assertNotIn(
