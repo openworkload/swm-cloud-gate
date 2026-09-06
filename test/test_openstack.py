@@ -1,19 +1,19 @@
 import os
 import socket
 import asyncio
+import unittest
 from multiprocessing import Process
 
 import aiohttp
 import uvicorn
-import asynctest
 
 
-class TestOpenstackGate(asynctest.TestCase):
+class TestOpenstackGate(unittest.IsolatedAsyncioTestCase):
 
     _hostname: str = socket.gethostname()
     _port: int = 8445
 
-    async def setUp(self):
+    async def asyncSetUp(self):
         self.maxDiff = None
         os.environ["SWM_TEST_CONFIG"] = "test/data/responses.json"
         self.proc = Process(
@@ -32,9 +32,11 @@ class TestOpenstackGate(asynctest.TestCase):
         await asyncio.sleep(0.5)  # time for the server to start
         self.assertTrue(self.proc.is_alive())
 
-    async def tearDown(self):
-        self.assertTrue(self.proc.is_alive())
-        self.proc.terminate()
+    async def asyncTearDown(self):
+        if self.proc.is_alive():
+            self.proc.terminate()
+        self.proc.join(timeout=5)
+        os.environ.pop("SWM_TEST_CONFIG", None)
 
     async def test_list_flavors(self):
         headers = {

@@ -1,14 +1,14 @@
 import os
 import socket
 import asyncio
+import unittest
 from multiprocessing import Process
 
 import aiohttp
 import uvicorn
-import asynctest
 
 
-class TestAzureGate(asynctest.TestCase):
+class TestAzureGate(unittest.IsolatedAsyncioTestCase):
 
     _hostname: str = socket.gethostname()
     _port: int = 8445
@@ -20,7 +20,7 @@ class TestAzureGate(asynctest.TestCase):
         "extra": "location=test",
     }
 
-    async def setUp(self):
+    async def asyncSetUp(self):
         self.maxDiff = None
         os.environ["SWM_TEST_CONFIG"] = "test/data/responses.json"
         # Point routers at a test cloud-gate.yaml that provides non-empty
@@ -45,10 +45,12 @@ class TestAzureGate(asynctest.TestCase):
         await asyncio.sleep(0.5)  # time for the server to start
         self.assertTrue(self.proc.is_alive())
 
-    async def tearDown(self):
-        self.assertTrue(self.proc.is_alive())
-        self.proc.terminate()
-
+    async def asyncTearDown(self):
+        if self.proc.is_alive():
+            self.proc.terminate()
+        self.proc.join(timeout=5)
+        os.environ.pop("SWM_TEST_CONFIG", None)
+        os.environ.pop("SWM_GATE_CONFIG", None)
     async def test_list_flavors(self):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.get(
@@ -294,7 +296,7 @@ class TestAzureGate(asynctest.TestCase):
             "containerimage": "swmregistry.azurecr.io/jupyter/datascience-notebook:hub-3.1.1",
             "flavorname": "Standard_B2s",
             "username": "user",
-            "count": "0",
+            "count": "1",
             "jobid": "3579a076-9924-11ee-ba53-a3132f7ae2fb",
             "partname": "part1",
             "runtime": "swm_source=ssh, ssh_pub_key=ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA7GA",
@@ -312,3 +314,34 @@ class TestAzureGate(asynctest.TestCase):
                     data = await resp.text()
         self.assertEqual(list(data.keys()), ["partition"])
         self.assertTrue(isinstance(data["partition"]["id"], str))
+
+    async def test_create_partition_invalid_count(self):
+        headers = {
+            "Accept": "application/json",
+            "subscriptionid": "test",
+            "tenantid": "test",
+            "appid": "test",
+            "containerregistryuser": "user",
+            "containerregistrypass": "pass",
+            "osversion": "ubuntu-22.04",
+            "containerimage": "swmregistry.azurecr.io/jupyter/datascience-notebook:hub-3.1.1",
+            "flavorname": "Standard_B2s",
+            "username": "user",
+            "count": "0",
+            "jobid": "3579a076-9924-11ee-ba53-a3132f7ae2fb",
+            "partname": "part-invalid",
+            "runtime": "swm_source=ssh, ssh_pub_key=ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA7GA",
+            "location": "eastus",
+            "ports": "10001,10022",
+        }
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.post(
+                url=f"http://{self._hostname}:{self._port}/azure/partitions",
+                json={"pem_data": "test"},
+            ) as resp:
+                self.assertEqual(resp.status, 400)
+                try:
+                    data = await resp.json()
+                except aiohttp.client_exceptions.ContentTypeError:
+                    data = await resp.text()
+        self.assertIn("detail", data)

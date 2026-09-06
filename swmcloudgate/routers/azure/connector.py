@@ -1,7 +1,9 @@
 import os
 import json
+import copy
 import typing
 import logging
+import shlex
 
 import jinja2
 from azure.identity import CertificateCredential
@@ -17,9 +19,16 @@ from swmcloudgate import cache
 from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
-TEMLPATE_FILE = "swmcloudgate/routers/azure/templates/partition.json"
+TEMPLATE_FILE = "swmcloudgate/routers/azure/templates/partition.json"
 CLOUD_INIT_SCRIPT_FILE = "swmcloudgate/routers/azure/templates/cloud-init.sh"
 CLOUD_INIT_YAML = "swmcloudgate/routers/azure/templates/cloud-init.yaml"
+MAX_VM_COUNT = 32
+AZURE_NETWORK_API_VERSION = "2021-05-01"
+HOST_NAME_PLACEHOLDER = "__SWM_HOST_NAME__"
+IS_MAIN_PLACEHOLDER = "__SWM_IS_MAIN__"
+MAIN_INSTANCE_HOSTNAME_PLACEHOLDER = "__SWM_MAIN_INSTANCE_HOSTNAME__"
+MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER = "__SWM_MAIN_INSTANCE_PRIVATE_IP__"
+STORAGE_KEY_B64_PLACEHOLDER = "__SWM_STORAGE_KEY_B64__"
 
 
 class AzureConnector(BaseConnector):
@@ -67,6 +76,21 @@ class AzureConnector(BaseConnector):
             )
             raise Exception(msg)
 
+    def _parse_vm_count(self, count_param: str | None) -> int:
+        """Parse and validate VM count parameter."""
+        if count_param is None or count_param == "":
+            return 1
+        try:
+            vm_count = int(count_param)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"Invalid VM count '{count_param}': must be an integer") from exc
+
+        if vm_count < 1:
+            raise ValueError(f"Invalid VM count {vm_count}: must be greater than or equal to 1")
+        if vm_count > MAX_VM_COUNT:
+            raise ValueError(f"Invalid VM count {vm_count}: maximum supported count is {MAX_VM_COUNT}")
+        return vm_count
+
     def _get_deployment_properties(
         self,
         job_id: str,
@@ -75,10 +99,12 @@ class AzureConnector(BaseConnector):
         os_version: str,
         username: str,
         user_pub_key: str,
+        storage_key: str,
         cloud_init_script: str,
         ports: str,
+        vm_count: int,
     ) -> dict[str, dict[str, typing.Any]]:
-        with open(TEMLPATE_FILE) as template_file:
+        with open(TEMPLATE_FILE) as template_file:
             template = json.load(template_file)
         template_parameters = self._get_template_parameters(
             job_id,
@@ -87,10 +113,17 @@ class AzureConnector(BaseConnector):
             os_version,
             username,
             user_pub_key,
+            storage_key,
             cloud_init_script,
         )
-        LOG.debug(f"Template parameters for job {job_id}: {template_parameters}")
+        sanitized_parameters = copy.deepcopy(template_parameters)
+        for secret_key in ("adminPasswordOrKey", "storageKey"):
+            if secret_key in sanitized_parameters:
+                sanitized_parameters[secret_key]["value"] = "***"
+        LOG.debug(f"Template parameters for job {job_id}: {sanitized_parameters}")
         self._append_security_rules(ports, template)
+        self._configure_main_vm_custom_data(template)
+        self._add_compute_vms(partition_name, vm_count, template)
         return {
             "properties": {
                 "template": template,
@@ -98,6 +131,175 @@ class AzureConnector(BaseConnector):
                 "mode": DeploymentMode.incremental,
             }
         }
+
+    def _find_resource(
+        self, resources: list[dict[str, typing.Any]], resource_type: str
+    ) -> dict[str, typing.Any] | None:
+        for resource in resources:
+            if resource.get("type") == resource_type:
+                return resource
+        return None
+
+    def _find_vm_extension_resources(self, resources: list[dict[str, typing.Any]]) -> list[dict[str, typing.Any]]:
+        return [
+            resource for resource in resources if resource.get("type") == "Microsoft.Compute/virtualMachines/extensions"
+        ]
+
+    def _get_main_vm_private_ip_expression(self) -> str:
+        return (
+            "reference(resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName')), "
+            f"'{AZURE_NETWORK_API_VERSION}').ipConfigurations[0].properties.privateIPAddress"
+        )
+
+    def _get_main_vm_name(self, partition_name: str) -> str:
+        return f"{partition_name}-main"
+
+    def _build_vm_custom_data(
+        self,
+        vm_name_expression: str,
+        is_main: bool,
+    ) -> str:
+        custom_data_expression = "parameters('cloudInitScript')"
+        replacements = (
+            (HOST_NAME_PLACEHOLDER, vm_name_expression),
+            (IS_MAIN_PLACEHOLDER, "'true'" if is_main else "'false'"),
+            (MAIN_INSTANCE_HOSTNAME_PLACEHOLDER, "parameters('vmNameMain')"),
+            (MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER, self._get_main_vm_private_ip_expression()),
+            (STORAGE_KEY_B64_PLACEHOLDER, "base64(parameters('storageKey'))"),
+        )
+        for placeholder, replacement in replacements:
+            custom_data_expression = f"replace({custom_data_expression}, '{placeholder}', {replacement})"
+        return f"[base64({custom_data_expression})]"
+
+    def _configure_main_vm_custom_data(self, template: dict[str, typing.Any]) -> None:
+        resources = template.get("resources", [])
+        main_vm_resource = self._find_resource(resources, "Microsoft.Compute/virtualMachines")
+        if not main_vm_resource:
+            LOG.warning("Could not find main VM resource in template")
+            return
+        main_vm_resource["properties"]["osProfile"]["customData"] = self._build_vm_custom_data(
+            "parameters('vmNameMain')",
+            is_main=True,
+        )
+
+    def _append_dependency(self, resource: dict[str, typing.Any], dependency: str) -> None:
+        depends_on = resource.setdefault("dependsOn", [])
+        if dependency not in depends_on:
+            depends_on.append(dependency)
+
+    def _remove_dependency(self, resource: dict[str, typing.Any], dependency: str) -> None:
+        depends_on = resource.get("dependsOn", [])
+        resource["dependsOn"] = [item for item in depends_on if item != dependency]
+
+    def _replace_vm_reference(self, value: typing.Any, compute_vm_name: str) -> typing.Any:
+        if isinstance(value, str):
+            return value.replace("parameters('vmNameMain')", f"'{compute_vm_name}'")
+        if isinstance(value, list):
+            return [self._replace_vm_reference(item, compute_vm_name) for item in value]
+        if isinstance(value, dict):
+            return {key: self._replace_vm_reference(item, compute_vm_name) for key, item in value.items()}
+        return value
+
+    def _strip_public_ip(self, nic_resource: dict[str, typing.Any]) -> None:
+        ip_configurations = nic_resource.get("properties", {}).get("ipConfigurations", [])
+        if not ip_configurations:
+            return
+        ip_configuration_properties = ip_configurations[0].get("properties", {})
+        ip_configuration_properties.pop("publicIPAddress", None)
+
+    def _clone_compute_nic(
+        self,
+        network_interface_resource: dict[str, typing.Any],
+        compute_nic_name: str,
+    ) -> dict[str, typing.Any]:
+        compute_nic_resource = copy.deepcopy(network_interface_resource)
+        compute_nic_resource["name"] = f"[format('{compute_nic_name}')]"
+        self._strip_public_ip(compute_nic_resource)
+        public_ip_dependency = "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPAddressName'))]"
+        self._remove_dependency(compute_nic_resource, public_ip_dependency)
+        return compute_nic_resource
+
+    def _clone_compute_vm(
+        self,
+        main_vm_resource: dict[str, typing.Any],
+        compute_vm_name: str,
+        compute_nic_name: str,
+    ) -> dict[str, typing.Any]:
+        compute_vm_resource = copy.deepcopy(main_vm_resource)
+        compute_vm_resource["name"] = f"[format('{compute_vm_name}')]"
+        compute_vm_resource["properties"]["networkProfile"]["networkInterfaces"][0][
+            "id"
+        ] = f"[resourceId('Microsoft.Network/networkInterfaces', '{compute_nic_name}')]"
+        compute_vm_resource["properties"]["osProfile"]["computerName"] = f"[format('{compute_vm_name}')]"
+        compute_vm_resource["properties"]["osProfile"]["customData"] = self._build_vm_custom_data(
+            f"'{compute_vm_name}'",
+            is_main=False,
+        )
+        compute_nic_dependency = f"[resourceId('Microsoft.Network/networkInterfaces', '{compute_nic_name}')]"
+        main_nic_dependency = "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]"
+        self._append_dependency(compute_vm_resource, compute_nic_dependency)
+        # Compute nodes keep the inherited main NIC dependency because customData references its private IP.
+        self._append_dependency(compute_vm_resource, main_nic_dependency)
+        return compute_vm_resource
+
+    def _clone_compute_vm_extension(
+        self,
+        extension_resource: dict[str, typing.Any],
+        compute_vm_name: str,
+    ) -> dict[str, typing.Any]:
+        compute_extension_resource = copy.deepcopy(extension_resource)
+        compute_extension_resource = self._replace_vm_reference(compute_extension_resource, compute_vm_name)
+        extension_name = extension_resource.get("name", "")
+        if "variables('extensionName')" in extension_name:
+            compute_extension_resource["name"] = f"[format('{compute_vm_name}/{{0}}', variables('extensionName'))]"
+        compute_vm_dependency = f"[resourceId('Microsoft.Compute/virtualMachines', '{compute_vm_name}')]"
+        original_vm_dependency = "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmNameMain'))]"
+        self._append_dependency(compute_extension_resource, compute_vm_dependency)
+        self._remove_dependency(compute_extension_resource, original_vm_dependency)
+        return compute_extension_resource
+
+    def _add_compute_vms(
+        self,
+        partition_name: str,
+        vm_count: int,
+        template: dict[str, typing.Any],
+    ) -> None:
+        """Add compute VMs and related resources to the template if vm_count > 1."""
+        if vm_count <= 1:
+            return
+
+        num_compute_vms = vm_count - 1
+        LOG.debug(f"Adding {num_compute_vms} compute VMs to partition {partition_name}")
+
+        resources = template.get("resources", [])
+        main_vm_resource = self._find_resource(resources, "Microsoft.Compute/virtualMachines")
+        if not main_vm_resource:
+            LOG.warning("Could not find main VM resource in template")
+            return
+
+        network_interface_resource = self._find_resource(resources, "Microsoft.Network/networkInterfaces")
+        if not network_interface_resource:
+            LOG.warning("Could not find network interface resource in template")
+            return
+
+        extension_resources = self._find_vm_extension_resources(resources)
+
+        for i in range(num_compute_vms):
+            compute_index = i + 1
+            compute_vm_name = f"{partition_name}-compute{compute_index}"
+            compute_nic_name = f"{partition_name}-compute{compute_index}-NetInt"
+
+            compute_nic_resource = self._clone_compute_nic(network_interface_resource, compute_nic_name)
+            resources.append(compute_nic_resource)
+
+            compute_vm_resource = self._clone_compute_vm(main_vm_resource, compute_vm_name, compute_nic_name)
+            resources.append(compute_vm_resource)
+
+            for extension_resource in extension_resources:
+                compute_extension_resource = self._clone_compute_vm_extension(extension_resource, compute_vm_name)
+                resources.append(compute_extension_resource)
+
+            LOG.debug(f"Added compute VM {compute_vm_name} to template")
 
     def _append_security_rules(self, ports: str, template: dict[str, typing.Any]) -> None:
         for resource in template["resources"]:
@@ -132,6 +334,7 @@ class AzureConnector(BaseConnector):
         os_version: str,
         username: str,
         user_pub_key: str,
+        storage_key: str,
         cloud_init_script: str,
     ) -> dict[str, str]:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
@@ -142,8 +345,10 @@ class AzureConnector(BaseConnector):
         )
         return {
             "resourcePrefix": {"value": partition_name},
+            "vmNameMain": {"value": self._get_main_vm_name(partition_name)},
             "adminUsername": {"value": username},
             "adminPasswordOrKey": {"value": user_pub_key},
+            "storageKey": {"value": storage_key},
             "osVersion": {"value": os_version},
             "vmSize": {"value": flavor_name},
             "cloudInitScript": {"value": cloud_init_yaml},
@@ -326,13 +531,15 @@ class AzureConnector(BaseConnector):
         container_registry_username: str,
         container_registry_password: str,
         storage_account: str,
-        storage_key: str,
         storage_container: str,
-        runtime_params: str,
+        runtime_params: dict[str, str],
         user_ssh_cert: str,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
-        template_env = jinja2.Environment(loader=template_loader, autoescape=True)
+        template_env = jinja2.Environment(  # nosec B701 - shellquote secures interpolated shell values here
+            loader=template_loader, autoescape=False
+        )
+        template_env.filters["shellquote"] = shlex.quote
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
         script: str = template.render(
             job_id=job_id,
@@ -343,10 +550,23 @@ class AzureConnector(BaseConnector):
             container_registry_username=container_registry_username,
             container_registry_password=container_registry_password,
             storage_account=storage_account,
-            storage_key=storage_key,
+            storage_key_b64=STORAGE_KEY_B64_PLACEHOLDER,
             storage_container=storage_container,
+            host_name=HOST_NAME_PLACEHOLDER,
+            is_main=IS_MAIN_PLACEHOLDER,
+            main_instance_hostname=MAIN_INSTANCE_HOSTNAME_PLACEHOLDER,
+            main_instance_private_ip=MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER,
         )
         return script
+
+    def _rollback_resource_group(self, resource_group_name: str) -> None:
+        LOG.warning(f"Rolling back failed deployment by deleting resource group {resource_group_name}")
+        try:
+            delete_operation = self._resource_client.resource_groups.begin_delete(resource_group_name)
+            if delete_operation:
+                delete_operation.result()
+        except Exception as rollback_error:
+            LOG.error(f"Failed to roll back resource group {resource_group_name}: {rollback_error}")
 
     def get_resource_group(self, resource_group_name: str) -> typing.Dict[str, typing.Any]:
         if "resource_groups" in self._test_responses:
@@ -422,6 +642,8 @@ class AzureConnector(BaseConnector):
         user_ssh_cert: str,
     ) -> tuple[DeploymentExtended, str]:
         resource_group_name = self._get_resource_group_name(partition_name)
+        vm_count = self._parse_vm_count(count)
+        LOG.info(f"Creating deployment with {vm_count} VM(s)")
 
         if self._test_responses:
             new_part = {
@@ -446,7 +668,6 @@ class AzureConnector(BaseConnector):
             container_registry_username,
             container_registry_password,
             storage_account,
-            storage_key,
             storage_container,
             runtime_params,
             user_ssh_cert,
@@ -460,8 +681,10 @@ class AzureConnector(BaseConnector):
             os_version,
             username,
             user_ssh_cert,
+            storage_key,
             cloud_init_script,
             ports,
+            vm_count,
         )
         try:
             deployment_async_operation = self._resource_client.deployments.begin_create_or_update(
@@ -470,11 +693,23 @@ class AzureConnector(BaseConnector):
                 deployment_properties,
             )
         except HttpResponseError as e:
+            self._rollback_resource_group(resource_group_name)
             LOG.error(e)
             raise e
+        except Exception:
+            self._rollback_resource_group(resource_group_name)
+            raise
 
         LOG.info(f"Deploying resource group {resource_group_name}, deployment: {deployment_name}")
-        return deployment_async_operation.result(), resource_group_name
+        try:
+            return deployment_async_operation.result(), resource_group_name
+        except HttpResponseError as e:
+            self._rollback_resource_group(resource_group_name)
+            LOG.error(e)
+            raise e
+        except Exception:
+            self._rollback_resource_group(resource_group_name)
+            raise
 
     def delete_resource_group(self, resource_group_name: str) -> str | None:
         if "resource_groups" in self._test_responses:

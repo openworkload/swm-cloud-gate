@@ -1,7 +1,35 @@
 #!/bin/bash -ex
 
-HOST_NAME=$(hostname)
+HOST_NAME="{{ host_name }}"
 SWM_ROOT="/opt/swm"
+PRIMARY_INTERFACE=""
+PRIVATE_IP_CIDR=""
+PRIVATE_SUBNET_CIDR=""
+IS_MAIN={{ is_main }}
+MAIN_INSTANCE_HOSTNAME="{{ main_instance_hostname }}"
+MAIN_INSTANCE_PRIVATE_IP="{{ main_instance_private_ip }}"
+
+detect_vm_context() {
+    PRIMARY_INTERFACE=$(ip -4 route list 0/0 | awk 'NR==1 { print $5 }')
+    PRIVATE_IP_CIDR=$(ip -4 -o addr show "$PRIMARY_INTERFACE" | awk 'NR==1 { print $4 }')
+    PRIVATE_SUBNET_CIDR=$(python3 - "$PRIVATE_IP_CIDR" <<'PY'
+import ipaddress
+import sys
+
+network = ipaddress.ip_interface(sys.argv[1]).network
+print(f"{network.network_address}/{network.netmask}")
+PY
+)
+if [[ -z "$PRIVATE_SUBNET_CIDR" ]]; then
+    echo "$(date): could not determine private subnet CIDR" >&2
+    return 1
+fi
+
+if [[ -z "$MAIN_INSTANCE_HOSTNAME" || -z "$MAIN_INSTANCE_PRIVATE_IP" ]]; then
+    echo "$(date): could not determine main instance details" >&2
+    return 1
+fi
+}
 
 mount_azure_storage() {
     echo Mount Azure storage
@@ -13,9 +41,11 @@ mount_azure_storage() {
     apt-get install fuse3 blobfuse2 -y
     popd
 
-    local azure_storage_account={{ storage_account }}
-    local azure_storage_key={{ storage_key }}
-    local azure_storage_container={{ storage_container }}
+    local azure_storage_account={{ storage_account | shellquote }}
+    local azure_storage_key_b64="{{ storage_key_b64 }}"
+    local azure_storage_key
+    azure_storage_key=$(printf '%s' "$azure_storage_key_b64" | base64 -d)
+    local azure_storage_container={{ storage_container | shellquote }}
 
     local config_file=/etc/blobfuse2.yaml
     local cache_dir=/tmp/blobfuse2.cache
@@ -62,18 +92,33 @@ EOF
     blobfuse2 mount $mount_dir --config-file=$config_file --read-only
 }
 
+wait_for_main_nfs() {
+    local attempt=0
+    local max_attempts=60
+
+    until timeout 2 bash -c "</dev/tcp/${MAIN_INSTANCE_PRIVATE_IP}/2049" >/dev/null 2>&1; do
+        (( attempt += 1 ))
+        if (( attempt >= max_attempts )); then
+            echo "$(date): NFS on ${MAIN_INSTANCE_PRIVATE_IP}:2049 did not become ready after ${max_attempts} attempts" >&2
+            return 1
+        fi
+        echo "$(date): waiting for NFS on ${MAIN_INSTANCE_PRIVATE_IP}:2049 (${attempt}/${max_attempts})"
+        sleep 5
+    done
+}
+
 create_directories() {
-    if [[ "{{ swm_source }}" == "ssh" ]]; then
+    if [[ {{ swm_source | shellquote }} == "ssh" ]]; then
         echo $(date) ": create directory $SWM_ROOT"
         mkdir -p "$SWM_ROOT"
     fi
 }
 
 setup_swm_worker() {
-    echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source }}"
+    echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source | shellquote }}"
 
-    if [[ "{{ swm_source }}" == "ssh" ]]; then
-        echo "{{ ssh_pub_key }}" >> /root/.ssh/authorized_keys
+    if [[ {{ swm_source | shellquote }} == "ssh" ]]; then
+        echo {{ ssh_pub_key | shellquote }} >> /root/.ssh/authorized_keys
         echo $(date) ": ensure swm worker is installed via ssh"
 
         local check_interval=15
@@ -101,10 +146,10 @@ setup_swm_worker() {
 
         ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py -v ${SWM_VERSION} -p ${SWM_ROOT} -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup.config
 
-    elif [[ "{{ swm_source }}" == "http://*.tar.gz" ]]; then
+    elif [[ {{ swm_source | shellquote }} == "http://*.tar.gz" ]]; then
         TMP_DIR=$(mktemp -d -t swm-worker-XXXXX)
         pushd $TMP_DIR
-        wget {{ swm_source }} --output-document=swm-worker.tar.gz
+        wget {{ swm_source | shellquote }} --output-document=swm-worker.tar.gz
         mkdir -p /opt/swm
         tar zfx ./swm-worker.tar.gz --directory /opt/swm/
         popd
@@ -130,10 +175,10 @@ setup_swm_worker() {
 }
 
 setup_network() {
-    GATEWAY_IP=$(ip -4 addr show $(ip -4 route list 0/0 | awk -F" " "{ print \$5 }") | grep -oP "(?<=inet\\s)\\d+(\\.\\d+){3}")
-    IS_MAIN=true
-    echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$GATEWAY_IP, master: ${IS_MAIN})"
-    echo $GATEWAY_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
+    detect_vm_context || exit 1
+    VM_PRIVATE_IP="${PRIVATE_IP_CIDR%%/*}"
+    echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$VM_PRIVATE_IP, master: ${IS_MAIN})"
+    echo $VM_PRIVATE_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
     echo $(date) ": /etc/hosts:"
     cat /etc/hosts
     echo
@@ -142,16 +187,16 @@ setup_network() {
 setup_mounts() {
     if [ $IS_MAIN == "true" ];
     then
-        echo "/home $PRIVATE_SUBNET_CIDR(rw,async,no_root_squash)" | sed "s/\\/25/\\/255.255.255.0/g" >> /etc/exports
+        echo "/home $PRIVATE_SUBNET_CIDR(rw,async,no_root_squash)" >> /etc/exports
         echo $(date) ": /etc/exports:"
         cat /etc/exports
         echo
 
-        # Temporary disable for debug purposes
-        #systemctl enable nfs-kernel-server
-        #systemctl restart nfs-kernel-server
-        #echo $(date) ": systemctl | grep nfs:"
-        #systemctl | grep nfs
+        exportfs -ra
+        systemctl enable nfs-kernel-server
+        systemctl restart nfs-kernel-server
+        echo $(date) ": systemctl | grep nfs:"
+        systemctl | grep nfs
 
     else
         echo "$MAIN_INSTANCE_PRIVATE_IP:/home /home nfs rsize=32768,wsize=32768,hard,intr,async 0 0" >> /etc/fstab
@@ -159,11 +204,21 @@ setup_mounts() {
         cat /etc/fstab
         echo
 
-        echo $(date) ": waiting for mount ..."
-        until mount -a || (( count++ >= 20 )); do sleep 5; done
-        echo $(date) ": mounted."
+        wait_for_main_nfs
 
-        systemctl restart docker # fix rare "connection closed" issues
+        local count=0
+        local max_mount_attempts=60
+        echo $(date) ": waiting for mount ..."
+        until mount -a; do
+            (( count += 1 ))
+            if (( count >= max_mount_attempts )); then
+                echo "$(date): failed to mount shared /home after ${max_mount_attempts} attempts" >&2
+                return 1
+            fi
+            echo "$(date): mount attempt ${count}/${max_mount_attempts} failed, retrying in 5 seconds"
+            sleep 5
+        done
+        echo $(date) ": mounted."
     fi
     echo
 
@@ -189,13 +244,18 @@ setup_docker() {
 }
 
 pull_container_image() {
-    if [ "{{ container_registry_password }}" != "" ]; then
-        echo $(date) ": login to the registry: {{ container_registry }}"
-        docker login {{ container_registry }} --username {{ container_registry_username }} --password {{ container_registry_password }}
+    local container_registry={{ container_registry | shellquote }}
+    local container_registry_username={{ container_registry_username | shellquote }}
+    local container_registry_password={{ container_registry_password | shellquote }}
+    local container_image={{ container_image | shellquote }}
+
+    if [ -n "$container_registry_password" ]; then
+        echo $(date) ": login to the registry: $container_registry"
+        docker login "$container_registry" --username "$container_registry_username" --password "$container_registry_password"
     fi
 
-    echo $(date) ": pull job container image from container registry: {{ container_image }}"
-    docker pull {{ container_image }}
+    echo $(date) ": pull job container image from container registry: $container_image"
+    docker pull "$container_image"
 
     echo $(date) ": all local docker images after the pulling:"
     docker images

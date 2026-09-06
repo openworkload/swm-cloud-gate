@@ -42,7 +42,7 @@ async def create_partition(
         LOG.debug(f" * containerimage: {containerimage}")
         LOG.debug(f" * flavor: {flavorname}")
         LOG.debug(f" * username: {username}")
-        LOG.debug(f" * extra nodes: {count}")
+        LOG.debug(f" * vm count: {count}")
         LOG.debug(f" * runtime: {runtime}")
         LOG.debug(f" * location: {location}")
         LOG.debug(f" * ports: {ports}")
@@ -126,6 +126,9 @@ async def create_partition(
             LOG.debug(f"Partition: {partition}")
 
             return {"error": f"Error from Azure: {'; '.join(error_messages)}", "partition": partition}
+
+    except ValueError as e:
+        raise HTTPException(status_code=http.HTTPStatus.BAD_REQUEST, detail=str(e)) from e
 
     except Exception as e:
         LOG.error(traceback.format_exception(e))
