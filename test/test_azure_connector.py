@@ -201,12 +201,14 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         )
 
         self.assertIn("pa&ss<word>", cloud_init_script)
-        self.assertIn("local container_registry_password='pa&ss<word>'", cloud_init_script)
+        self.assertIn("container_registry_password='pa&ss<word>'", cloud_init_script)
         self.assertIn('if [ -n "$container_registry_password" ]; then', cloud_init_script)
+        self.assertIn("--password-stdin", cloud_init_script)
         self.assertIn(
-            'docker login "$container_registry" --username "$container_registry_username" --password "$container_registry_password"',
+            'docker login "$container_registry"',
             cloud_init_script,
         )
+        self.assertNotIn('--password "$container_registry_password"', cloud_init_script)
         self.assertIn('docker pull "$container_image"', cloud_init_script)
         self.assertNotIn("pa&amp;ss&lt;word&gt;", cloud_init_script)
 

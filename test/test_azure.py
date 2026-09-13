@@ -1,5 +1,4 @@
 import os
-import socket
 import asyncio
 import unittest
 from multiprocessing import Process
@@ -10,8 +9,8 @@ import uvicorn
 
 class TestAzureGate(unittest.IsolatedAsyncioTestCase):
 
-    _hostname: str = socket.gethostname()
-    _port: int = 8445
+    _hostname: str = "127.0.0.1"
+    _port: int = 18445
     _default_headers = {
         "Accept": "application/json",
         "subscriptionid": "test",
@@ -19,6 +18,22 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         "appid": "test",
         "extra": "location=test",
     }
+
+    async def _wait_for_server(self, timeout: float = 15.0) -> None:
+        deadline = asyncio.get_running_loop().time() + timeout
+        last_error = None
+        while asyncio.get_running_loop().time() < deadline:
+            if not self.proc.is_alive():
+                self.fail("uvicorn process died before becoming ready")
+            try:
+                reader, writer = await asyncio.open_connection(self._hostname, self._port)
+                writer.close()
+                await writer.wait_closed()
+                return
+            except OSError as exc:
+                last_error = exc
+                await asyncio.sleep(0.1)
+        self.fail(f"server did not become ready on {self._hostname}:{self._port}: {last_error}")
 
     async def asyncSetUp(self):
         self.maxDiff = None
@@ -35,15 +50,14 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
             kwargs={
                 "host": self._hostname,
                 "port": self._port,
-                "log_config": "swmcloudgate/logging.yaml",
+                "log_config": None,
                 "reload": False,
                 "timeout_keep_alive": 60,
             },
             daemon=True,
         )
         self.proc.start()
-        await asyncio.sleep(0.5)  # time for the server to start
-        self.assertTrue(self.proc.is_alive())
+        await self._wait_for_server()
 
     async def asyncTearDown(self):
         if self.proc.is_alive():
