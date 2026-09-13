@@ -89,16 +89,20 @@ class Cache:
             data = self._read(cache_file_path)
         else:
             cache_file_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_file_path.touch(exist_ok=True)
         return data, cache_file_path
 
     def _read(self, file_path: Path) -> list[tuple[datetime, list[str], list[BaseModel]]]:
         LOG.debug(f"Read cache: {file_path}")
         try:
+            if file_path.stat().st_size == 0:
+                LOG.debug(f"Removing empty cache file: {file_path}")
+                file_path.unlink(missing_ok=True)
+                return []
             with open(file_path, "rb") as file:
                 return pickle.load(file)  # nosec B301
         except EOFError as e:
             LOG.debug(f"Cannot load cache file {file_path}: {e}")
+            file_path.unlink(missing_ok=True)
         except FileNotFoundError as e:
             LOG.debug(f"File not found: {e}")
         return []

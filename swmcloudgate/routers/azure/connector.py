@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import copy
 import typing
@@ -23,6 +24,8 @@ TEMPLATE_FILE = "swmcloudgate/routers/azure/templates/partition.json"
 CLOUD_INIT_SCRIPT_FILE = "swmcloudgate/routers/azure/templates/cloud-init.sh"
 CLOUD_INIT_YAML = "swmcloudgate/routers/azure/templates/cloud-init.yaml"
 MAX_VM_COUNT = 32
+# ARM TemplateInputParameter does not support allowedPattern; validate in Python instead.
+ADMIN_USERNAME_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 AZURE_NETWORK_API_VERSION = "2021-05-01"
 HOST_NAME_PLACEHOLDER = "__SWM_HOST_NAME__"
 IS_MAIN_PLACEHOLDER = "__SWM_IS_MAIN__"
@@ -91,6 +94,13 @@ class AzureConnector(BaseConnector):
             raise ValueError(f"Invalid VM count {vm_count}: maximum supported count is {MAX_VM_COUNT}")
         return vm_count
 
+    def _validate_admin_username(self, username: str) -> None:
+        """Validate Linux-compatible admin username used in authorized_keys path."""
+        if not ADMIN_USERNAME_PATTERN.fullmatch(username or ""):
+            raise ValueError(
+                f"Invalid admin username '{username}': must match {ADMIN_USERNAME_PATTERN.pattern}"
+            )
+
     def _get_deployment_properties(
         self,
         job_id: str,
@@ -104,6 +114,7 @@ class AzureConnector(BaseConnector):
         ports: str,
         vm_count: int,
     ) -> dict[str, dict[str, typing.Any]]:
+        self._validate_admin_username(username)
         with open(TEMPLATE_FILE) as template_file:
             template = json.load(template_file)
         template_parameters = self._get_template_parameters(
@@ -407,20 +418,34 @@ class AzureConnector(BaseConnector):
         return result
 
     def _add_gpus(self, location: str, size_map: dict[str, VirtualMachineSize]) -> None:
-        LOG.debug("Retrieve GPU flavors information from Azure")
-        skus = self._compute_client.resource_skus.list()
+        # Filter by location on the server side — an unfiltered list() response is
+        # ~100MB+ and can OOM gate workers on small hosts.
+        LOG.debug("Retrieve GPU flavors information from Azure for location=%s", location)
+        skus = self._compute_client.resource_skus.list(filter=f"location eq '{location}'")
+        location_l = location.lower()
         for sku in skus:
             if sku.resource_type.lower() != "virtualmachines":
                 continue
-            if sku.name not in size_map.keys():
+            if sku.name not in size_map:
                 continue
-            location_from_sku = sku.locations[0] if sku.locations else "Unknown"
-            if location != location_from_sku:
+            sku_locations = [loc.lower() for loc in (sku.locations or [])]
+            if location_l not in sku_locations:
                 continue
             if gpu_count := next((int(c.value) for c in sku.capabilities if c.name.lower() == "gpus"), 0):
                 size_map[sku.name].extra["gpus"] = gpu_count
 
     def _add_prices(self, location: str, size_map: dict[str, VirtualMachineSize]) -> list[VirtualMachineSize]:
+        # The Commerce rate-card payload is ~100MB+ and routinely OOMs small gate
+        # hosts. Opt in with SWM_AZURE_FETCH_PRICES=1 when you have enough RAM.
+        if os.environ.get("SWM_AZURE_FETCH_PRICES", "0") != "1":
+            LOG.info(
+                "Skipping Azure rate-card price fetch "
+                "(set SWM_AZURE_FETCH_PRICES=1 to enable); returning sizes with price=0"
+            )
+            for size in size_map.values():
+                size.extra.setdefault("price", 0)
+            return list(size_map.values())
+
         results: list[VirtualMachineSize] = []
 
         if self._subscription.subscription_policies.quota_id.lower().startswith("payasyougo"):

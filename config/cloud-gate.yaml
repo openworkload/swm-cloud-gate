@@ -22,3 +22,4 @@ providers:
       offer: "ubuntu-hpc"
       skus: "2204"
     user_ssh_cert: ""
+    location: "eastus2"

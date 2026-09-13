@@ -42,6 +42,7 @@ class AzureProvider(BaseModel):
     storage: AzureStorage = AzureStorage()
     vm_image: AzureVmImage = AzureVmImage()
     user_ssh_cert: str = ""
+    location: str = "eastus2"
 
 
 class Providers(BaseModel):

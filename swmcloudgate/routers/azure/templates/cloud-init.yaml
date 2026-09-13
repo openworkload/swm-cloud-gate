@@ -2,14 +2,18 @@
 disable_root: false
 ssh_pwauth: true
 
+# Keep this list minimal. Azure HPC/GPU images already ship Moby Docker;
+# installing docker.io here removes moby-* and races apt with runcmd.
+# Docker is ensured in swm-init.sh (setup_docker). blobfuse2 needs the
+# Microsoft apt repo, so it is also installed from the script.
 packages:
-  - docker
-  - docker.io
   - cgroupfs-mount
   - net-tools
   - nfs-common
   - nfs-kernel-server
-#  - blobfuse2
+
+package_update: false
+package_upgrade: false
 
 write_files:
   - path: /tmp/swm-init.sh
@@ -18,4 +22,4 @@ write_files:
 {{cloud_init_script}}
 
 runcmd:
-  - bash /tmp/swm-init.sh
+  - bash -ex /tmp/swm-init.sh

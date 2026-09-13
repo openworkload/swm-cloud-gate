@@ -57,6 +57,16 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.connector._parse_vm_count(str(MAX_VM_COUNT + 1))
 
+    def test_validate_admin_username_accepts_linux_compatible_names(self):
+        self.connector._validate_admin_username("taras")
+        self.connector._validate_admin_username("a")
+        self.connector._validate_admin_username("user_name-1")
+
+    def test_validate_admin_username_rejects_invalid_names(self):
+        for username in ("", "Taras", "1user", "user.name", "a" * 33):
+            with self.assertRaises(ValueError):
+                self.connector._validate_admin_username(username)
+
     def test_add_compute_vms_keeps_single_vm_template_unchanged(self):
         template = self._load_template()
         original_resource_count = len(template["resources"])
