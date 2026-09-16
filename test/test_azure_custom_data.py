@@ -71,13 +71,21 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             cloud_init_script,
         )
         self.assertIn(
-            "echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC== user@example' >> /root/.ssh/authorized_keys",
+            "ensure_root_authorized_key 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC== user@example'",
             cloud_init_script,
         )
+        self.assertIn("setup_passwordless_root_ssh", cloud_init_script)
+        self.assertIn("PermitRootLogin prohibit-password", cloud_init_script)
+        self.assertIn("/home/.swm/cluster_root.pub", cloud_init_script)
         self.assertNotIn("&lt;", cloud_init_script)
         self.assertNotIn("&gt;", cloud_init_script)
         self.assertNotIn("&amp;", cloud_init_script)
         self.assertNotIn("getent hosts", cloud_init_script)
+        self.assertIn("setup_log_symlinks", cloud_init_script)
+        self.assertIn('local swm_log_dir="/opt/swm/spool/${HOST_NAME}@${domain}/log"', cloud_init_script)
+        self.assertIn('local job_dir="/opt/swm/spool/job/job-1"', cloud_init_script)
+        self.assertIn('ln -s "$swm_log_dir" /var/log/swm', cloud_init_script)
+        self.assertIn('ln -s "$job_dir" /var/log/job', cloud_init_script)
 
     def test_main_vm_custom_data_replaces_placeholders_via_arm(self):
         template = self._load_template()

@@ -43,9 +43,22 @@ function download_swm_worker() {
     cat /etc/swm.conf
     echo
 
-    JOB_DIR=/opt/swm/spool/job/{{ job_id }}
-    echo $(date) ": create job directory: $JOB_DIR"
-    mkdir -p $JOB_DIR
+    # Runs on every job node. Expose spool paths under /var/log.
+    local domain="${HOST_NAME}.openworkload.org"
+    local swm_log_dir="/opt/swm/spool/${HOST_NAME}@${domain}/log"
+    local job_dir="/opt/swm/spool/job/{{ job_id }}"
+    echo "$(date): ensure directories $swm_log_dir and $job_dir"
+    mkdir -p "$swm_log_dir" "$job_dir"
+    echo "$(date): link /var/log/swm -> $swm_log_dir"
+    if [[ -e /var/log/swm || -L /var/log/swm ]]; then
+        rm -rf /var/log/swm
+    fi
+    ln -s "$swm_log_dir" /var/log/swm
+    echo "$(date): link /var/log/job -> $job_dir"
+    if [[ -e /var/log/job || -L /var/log/job ]]; then
+        rm -rf /var/log/job
+    fi
+    ln -s "$job_dir" /var/log/job
 
     systemctl enable swm
     systemctl start swm

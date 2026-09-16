@@ -1,6 +1,7 @@
 #cloud-config
 disable_root: false
-ssh_pwauth: true
+# Root/cluster access is key-based only (see setup_passwordless_root_ssh).
+ssh_pwauth: false
 
 # Keep this list minimal. Azure HPC/GPU images already ship Moby Docker;
 # installing docker.io here removes moby-* and races apt with runcmd.

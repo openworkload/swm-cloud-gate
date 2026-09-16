@@ -204,11 +204,35 @@ create_directories() {
     fi
 }
 
+setup_log_symlinks() {
+    # Runs on every job node (main and compute). SWM/job paths stay under spool;
+    # expose convenient locations under /var/log.
+    local domain="${HOST_NAME}.openworkload.org"
+    local swm_log_dir="/opt/swm/spool/${HOST_NAME}@${domain}/log"
+    local job_dir="/opt/swm/spool/job/{{ job_id }}"
+
+    echo "$(date): ensure directories $swm_log_dir and $job_dir"
+    mkdir -p "$swm_log_dir" "$job_dir"
+
+    echo "$(date): link /var/log/swm -> $swm_log_dir"
+    if [[ -e /var/log/swm || -L /var/log/swm ]]; then
+        rm -rf /var/log/swm
+    fi
+    ln -s "$swm_log_dir" /var/log/swm
+
+    echo "$(date): link /var/log/job -> $job_dir"
+    if [[ -e /var/log/job || -L /var/log/job ]]; then
+        rm -rf /var/log/job
+    fi
+    ln -s "$job_dir" /var/log/job
+
+    ls -ld /var/log/swm /var/log/job "$swm_log_dir" "$job_dir"
+}
+
 setup_swm_worker() {
     echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source | shellquote }}"
 
     if [[ {{ swm_source | shellquote }} == "ssh" ]]; then
-        echo {{ ssh_pub_key | shellquote }} >> /root/.ssh/authorized_keys
         echo $(date) ": ensure swm worker is installed via ssh"
 
         local check_interval=15
@@ -250,9 +274,7 @@ setup_swm_worker() {
     cat /etc/swm.conf
     echo
 
-    JOB_DIR=/opt/swm/spool/job/{{ job_id }}
-    echo $(date) ": create job directory: $JOB_DIR"
-    mkdir -p $JOB_DIR
+    setup_log_symlinks
 
     systemctl enable swm
     systemctl start swm
@@ -285,9 +307,85 @@ setup_network() {
     echo
 }
 
+setup_passwordless_root_ssh() {
+    # Key-based root SSH with no password. Main publishes its root pubkey via
+    # shared /home NFS; compute nodes install it after the mount.
+    echo "$(date): configure passwordless root SSH (IS_MAIN=$IS_MAIN)"
+    mkdir -p /root/.ssh
+    chmod 700 /root/.ssh
+
+    mkdir -p /etc/ssh/sshd_config.d
+    cat > /etc/ssh/sshd_config.d/99-swm-root-key.conf <<'EOF'
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+PasswordAuthentication no
+EOF
+    if ! systemctl reload sshd 2>/dev/null; then
+        systemctl reload ssh 2>/dev/null || true
+    fi
+
+    cat > /root/.ssh/config <<'EOF'
+Host *
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+EOF
+    chmod 600 /root/.ssh/config
+
+    ensure_root_authorized_key() {
+        local key="$1"
+        [[ -n "$key" ]] || return 0
+        touch /root/.ssh/authorized_keys
+        chmod 600 /root/.ssh/authorized_keys
+        grep -qxF "$key" /root/.ssh/authorized_keys || echo "$key" >> /root/.ssh/authorized_keys
+    }
+
+    # Sky Port / user provisioning key (all nodes).
+    ensure_root_authorized_key {{ ssh_pub_key | shellquote }}
+
+    local cluster_pub=/home/.swm/cluster_root.pub
+    if [[ "$IS_MAIN" == "true" ]]; then
+        if [[ ! -f /root/.ssh/id_rsa ]]; then
+            ssh-keygen -t rsa -b 4096 -N "" -f /root/.ssh/id_rsa -C "swm-cluster-root"
+        fi
+        mkdir -p /home/.swm
+        cp -f /root/.ssh/id_rsa.pub "$cluster_pub"
+        chmod 755 /home/.swm
+        chmod 644 "$cluster_pub"
+        ensure_root_authorized_key "$(cat /root/.ssh/id_rsa.pub)"
+        echo "$(date): published cluster root pubkey to $cluster_pub"
+    else
+        local attempt=0
+        local max_attempts=60
+        while [[ ! -f "$cluster_pub" ]]; do
+            (( attempt += 1 ))
+            if (( attempt >= max_attempts )); then
+                echo "$(date): timed out waiting for main root pubkey at $cluster_pub" >&2
+                return 1
+            fi
+            echo "$(date): waiting for main root pubkey ($attempt/$max_attempts)"
+            sleep 5
+        done
+        ensure_root_authorized_key "$(cat "$cluster_pub")"
+        echo "$(date): installed main root pubkey into /root/.ssh/authorized_keys"
+    fi
+
+    chmod 600 /root/.ssh/authorized_keys
+    ls -la /root/.ssh/
+}
+
 setup_mounts() {
     if [ $IS_MAIN == "true" ];
     then
+        # Publish cluster root key before NFS export so compute nodes can fetch it.
+        mkdir -p /root/.ssh /home/.swm
+        chmod 700 /root/.ssh
+        if [[ ! -f /root/.ssh/id_rsa ]]; then
+            ssh-keygen -t rsa -b 4096 -N "" -f /root/.ssh/id_rsa -C "swm-cluster-root"
+        fi
+        cp -f /root/.ssh/id_rsa.pub /home/.swm/cluster_root.pub
+        chmod 755 /home/.swm
+        chmod 644 /home/.swm/cluster_root.pub
+
         echo "/home $PRIVATE_SUBNET_CIDR(rw,async,no_root_squash,no_subtree_check)" >> /etc/exports
         echo $(date) ": /etc/exports:"
         cat /etc/exports
@@ -393,6 +491,7 @@ pull_container_image() {
 create_directories
 setup_network
 setup_mounts
+setup_passwordless_root_ssh
 setup_docker
 pull_container_image
 setup_swm_worker
