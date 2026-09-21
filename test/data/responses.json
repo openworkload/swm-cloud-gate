@@ -48,7 +48,58 @@
         {
           "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg1-resource-group",
           "name": "rg1",
-          "resources": []
+          "resources": [
+            {
+              "type": "Microsoft.Network/publicIPAddresses",
+              "name": "rg1-PublicIP",
+              "properties": {
+                "ipAddress": "20.1.2.3",
+                "provisioningState": "Succeeded"
+              }
+            },
+            {
+              "type": "Microsoft.Network/networkInterfaces",
+              "name": "rg1-compute2-NetInt",
+              "properties": {
+                "provisioningState": "Succeeded",
+                "ipConfigurations": [
+                  {
+                    "properties": {
+                      "privateIPAddress": "10.0.0.8"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Network/networkInterfaces",
+              "name": "rg1-NetInt",
+              "properties": {
+                "provisioningState": "Succeeded",
+                "ipConfigurations": [
+                  {
+                    "properties": {
+                      "privateIPAddress": "10.0.0.4"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "Microsoft.Network/networkInterfaces",
+              "name": "rg1-compute1-NetInt",
+              "properties": {
+                "provisioningState": "Succeeded",
+                "ipConfigurations": [
+                  {
+                    "properties": {
+                      "privateIPAddress": "10.0.0.7"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
         },
         {
           "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg2-resource-group",

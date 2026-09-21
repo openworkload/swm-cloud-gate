@@ -197,6 +197,25 @@ wait_for_main_nfs() {
     done
 }
 
+wait_for_shared_swm_root() {
+    # Compute nodes use NFS-exported /opt/swm from main (no local worker unpack).
+    local attempt=0
+    local max_attempts=120
+
+    until mountpoint -q "$SWM_ROOT" && [[ -d "$SWM_ROOT/spool" ]]; do
+        (( attempt += 1 ))
+        if (( attempt >= max_attempts )); then
+            echo "$(date): timed out waiting for shared $SWM_ROOT (mounted=$(mountpoint -q "$SWM_ROOT" && echo yes || echo no), spool=$([[ -d $SWM_ROOT/spool ]] && echo yes || echo no))" >&2
+            mount | grep -E "swm|nfs" || true
+            ls -la "$SWM_ROOT" 2>/dev/null || true
+            return 1
+        fi
+        echo "$(date): waiting for shared $SWM_ROOT mount and spool (${attempt}/${max_attempts})"
+        sleep 5
+    done
+    echo "$(date): shared $SWM_ROOT is mounted and spool exists"
+}
+
 create_directories() {
     if [[ {{ swm_source | shellquote }} == "ssh" ]]; then
         echo $(date) ": create directory $SWM_ROOT"
@@ -230,9 +249,19 @@ setup_log_symlinks() {
 }
 
 setup_swm_worker() {
-    echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source | shellquote }}"
+    echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source | shellquote }} IS_MAIN=$IS_MAIN"
 
-    if [[ {{ swm_source | shellquote }} == "ssh" ]]; then
+    if [[ "$IS_MAIN" != "true" ]]; then
+        echo "$(date): compute node uses NFS-shared $SWM_ROOT from main (skip worker archive unpack)"
+        wait_for_shared_swm_root
+        source /opt/swm/*/scripts/swm.env
+        ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py \
+            -v ${SWM_VERSION} \
+            -p ${SWM_ROOT} \
+            -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup.config \
+            --job-node compute \
+            --parent-host "$MAIN_INSTANCE_HOSTNAME"
+    elif [[ {{ swm_source | shellquote }} == "ssh" ]]; then
         echo $(date) ": ensure swm worker is installed via ssh"
 
         local check_interval=15
@@ -258,7 +287,11 @@ setup_swm_worker() {
         mkdir -p /opt/swm/spool
         source /opt/swm/*/scripts/swm.env
 
-        ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py -v ${SWM_VERSION} -p ${SWM_ROOT} -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup.config
+        ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py \
+            -v ${SWM_VERSION} \
+            -p ${SWM_ROOT} \
+            -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup.config \
+            --job-node main
 
     elif [[ {{ swm_source | shellquote }} == "http://*.tar.gz" ]]; then
         TMP_DIR=$(mktemp -d -t swm-worker-XXXXX)
@@ -267,15 +300,69 @@ setup_swm_worker() {
         mkdir -p /opt/swm
         tar zfx ./swm-worker.tar.gz --directory /opt/swm/
         popd
+        mkdir -p /opt/swm/spool
+        source /opt/swm/*/scripts/swm.env
+        ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py \
+            -v ${SWM_VERSION} \
+            -p ${SWM_ROOT} \
+            -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup.config \
+            --job-node main
     fi
 
-    echo SWM_SNAME=$HOST_NAME > /etc/swm.conf
+    # Runtime parent must be explicit: swm.env defaults to localhost:10002 when unset.
+    if [[ "$IS_MAIN" == "true" ]]; then
+        # Sky Port via local tunnel parent port.
+        parent_host=localhost
+        parent_port=10002
+    else
+        # Parent is the job main node API (not the skyport tunnel defaults).
+        parent_host=$MAIN_INSTANCE_HOSTNAME
+        parent_port=10001
+    fi
+    if [[ -z "$parent_host" ]]; then
+        echo "$(date): SWM parent host is empty (IS_MAIN=$IS_MAIN)" >&2
+        return 1
+    fi
+
+    cat > /etc/swm.conf <<EOF
+SWM_SNAME=$HOST_NAME
+SWM_PARENT_HOST=$parent_host
+SWM_PARENT_PORT=$parent_port
+EOF
+    # Compute confdb must be local: entire /opt/swm (incl. spool) is NFS from main,
+    # and Mnesia force_load on NFS hangs wm_conf:init forever.
+    if [[ "$IS_MAIN" != "true" ]]; then
+        local_mnesia="/var/lib/swm/${HOST_NAME}/confdb"
+        mkdir -p "$local_mnesia"
+        echo "SWM_MNESIA_DIR=$local_mnesia" >> /etc/swm.conf
+    fi
     echo $(date) ": /etc/swm.conf:"
     cat /etc/swm.conf
     echo
 
+    # Environment= overrides EnvironmentFile; survives a partial /etc/swm.conf rewrite.
+    mkdir -p /etc/systemd/system/swm.service.d
+    if [[ "$IS_MAIN" == "true" ]]; then
+        cat > /etc/systemd/system/swm.service.d/parent.conf <<EOF
+[Service]
+Environment=SWM_PARENT_HOST=$parent_host
+Environment=SWM_PARENT_PORT=$parent_port
+EOF
+    else
+        cat > /etc/systemd/system/swm.service.d/parent.conf <<EOF
+[Service]
+Environment=SWM_PARENT_HOST=$parent_host
+Environment=SWM_PARENT_PORT=$parent_port
+Environment=SWM_MNESIA_DIR=/var/lib/swm/${HOST_NAME}/confdb
+EOF
+    fi
+    echo $(date) ": /etc/systemd/system/swm.service.d/parent.conf:"
+    cat /etc/systemd/system/swm.service.d/parent.conf
+    echo
+
     setup_log_symlinks
 
+    systemctl daemon-reload
     systemctl enable swm
     systemctl start swm
 
@@ -302,6 +389,10 @@ setup_network() {
     VM_PRIVATE_IP="${PRIVATE_IP_CIDR%%/*}"
     echo $(date) ": start VM initialization (HOST: $HOST_NAME, IP=$VM_PRIVATE_IP, master: ${IS_MAIN})"
     echo $VM_PRIVATE_IP $HOST_NAME.openworkload.org $HOST_NAME >> /etc/hosts
+    if [[ "$IS_MAIN" != "true" ]]; then
+        # Resolve job main by hostname for SWM_PARENT_HOST (API on :10001).
+        echo "$MAIN_INSTANCE_PRIVATE_IP $MAIN_INSTANCE_HOSTNAME.openworkload.org $MAIN_INSTANCE_HOSTNAME" >> /etc/hosts
+    fi
     echo $(date) ": /etc/hosts:"
     cat /etc/hosts
     echo
@@ -377,7 +468,7 @@ setup_mounts() {
     if [ $IS_MAIN == "true" ];
     then
         # Publish cluster root key before NFS export so compute nodes can fetch it.
-        mkdir -p /root/.ssh /home/.swm
+        mkdir -p /root/.ssh /home/.swm "$SWM_ROOT"
         chmod 700 /root/.ssh
         if [[ ! -f /root/.ssh/id_rsa ]]; then
             ssh-keygen -t rsa -b 4096 -N "" -f /root/.ssh/id_rsa -C "swm-cluster-root"
@@ -386,7 +477,9 @@ setup_mounts() {
         chmod 755 /home/.swm
         chmod 644 /home/.swm/cluster_root.pub
 
+        # Share /home and /opt/swm with compute nodes (worker is unpacked on main only).
         echo "/home $PRIVATE_SUBNET_CIDR(rw,async,no_root_squash,no_subtree_check)" >> /etc/exports
+        echo "$SWM_ROOT $PRIVATE_SUBNET_CIDR(rw,async,no_root_squash,no_subtree_check)" >> /etc/exports
         echo $(date) ": /etc/exports:"
         cat /etc/exports
         echo
@@ -399,6 +492,7 @@ setup_mounts() {
 
     else
         echo "$MAIN_INSTANCE_PRIVATE_IP:/home /home nfs rsize=32768,wsize=32768,hard,intr,async 0 0" >> /etc/fstab
+        echo "$MAIN_INSTANCE_PRIVATE_IP:$SWM_ROOT $SWM_ROOT nfs rsize=32768,wsize=32768,hard,intr,async 0 0" >> /etc/fstab
         echo $(date) ": /etc/fstab:"
         cat /etc/fstab
         echo
@@ -411,13 +505,14 @@ setup_mounts() {
         until mount -a; do
             (( count += 1 ))
             if (( count >= max_mount_attempts )); then
-                echo "$(date): failed to mount shared /home after ${max_mount_attempts} attempts" >&2
+                echo "$(date): failed to mount shared /home and $SWM_ROOT after ${max_mount_attempts} attempts" >&2
                 return 1
             fi
             echo "$(date): mount attempt ${count}/${max_mount_attempts} failed, retrying in 5 seconds"
             sleep 5
         done
         echo $(date) ": mounted."
+        mountpoint -q /home && mountpoint -q "$SWM_ROOT"
     fi
     echo
 

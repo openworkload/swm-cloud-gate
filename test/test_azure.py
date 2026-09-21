@@ -116,14 +116,14 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
             {
                 "partitions": [
                     {
-                        "compute_instances_ips": [],
+                        "compute_instances_ips": ["10.0.0.7", "10.0.0.8"],
                         "created": None,
                         "description": None,
                         "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg1-resource-group",
-                        "master_private_ip": "",
-                        "master_public_ip": "",
+                        "master_private_ip": "10.0.0.4",
+                        "master_public_ip": "20.1.2.3",
                         "name": "rg1",
-                        "status": None,
+                        "status": "succeeded",
                         "updated": None,
                     },
                     {
@@ -198,14 +198,14 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             data,
             {
-                "compute_instances_ips": [],
+                "compute_instances_ips": ["10.0.0.7", "10.0.0.8"],
                 "created": None,
                 "description": None,
                 "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg1-resource-group",
-                "master_private_ip": "",
-                "master_public_ip": "",
+                "master_private_ip": "10.0.0.4",
+                "master_public_ip": "20.1.2.3",
                 "name": "rg1",
-                "status": None,
+                "status": "succeeded",
                 "updated": None,
             },
         )

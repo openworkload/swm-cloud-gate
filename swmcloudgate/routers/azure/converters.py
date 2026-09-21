@@ -14,6 +14,28 @@ PART_ID_PATTERN = re.compile(
     r"^(/subscriptions/[^/]+/resourceGroups/[^/]+)(?:/|$)",
     re.IGNORECASE,
 )
+# Compute NICs are named "{partition}-compute{N}-NetInt"; main is "{partition}-NetInt".
+COMPUTE_NIC_NAME_PATTERN = re.compile(r"^.+-compute(\d+)-NetInt$", re.IGNORECASE)
+
+
+def _resource_attr(resource: typing.Any, name: str) -> typing.Any:
+    if isinstance(resource, dict):
+        return resource.get(name)
+    return getattr(resource, name, None)
+
+
+def _nic_private_ip(resource: typing.Any) -> str | None:
+    properties = _resource_attr(resource, "properties") or {}
+    if not hasattr(properties, "get"):
+        return None
+    ip_configurations = properties.get("ipConfigurations") or []
+    if not ip_configurations:
+        return None
+    first = ip_configurations[0]
+    if not isinstance(first, dict):
+        return None
+    private_ip = (first.get("properties") or {}).get("privateIPAddress")
+    return private_ip or None
 
 
 def extract_parameters(data: str) -> dict[str, str]:
@@ -76,10 +98,13 @@ def convert_to_partition(data: dict[str, typing.Any], resource_group_name: str) 
     updating = False
     deleting = False
     creating = False
+    compute_ips: list[tuple[int, str]] = []
 
     for resource in data.get("resources", []):
-        if not failed and resource.properties:
-            if provisioning_state := resource.properties.get("provisioningState"):
+        properties = _resource_attr(resource, "properties") or {}
+        resource_type = _resource_attr(resource, "type")
+        if not failed and hasattr(properties, "get"):
+            if provisioning_state := properties.get("provisioningState"):
                 provisioning_state = provisioning_state.lower()
                 if provisioning_state == "failed":
                     failed = True
@@ -91,11 +116,21 @@ def convert_to_partition(data: dict[str, typing.Any], resource_group_name: str) 
                     updating = True
                 elif provisioning_state == "deleting":
                     deleting = True
-        if resource.type == "Microsoft.Network/publicIPAddresses":
-            part.master_public_ip = resource.properties.get("ipAddress")
-        if resource.type == "Microsoft.Network/networkInterfaces":
-            if ip_conf := resource.properties.get("ipConfigurations"):
-                part.master_private_ip = ip_conf[0].get("properties", {}).get("privateIPAddress")
+        if resource_type == "Microsoft.Network/publicIPAddresses" and hasattr(properties, "get"):
+            if public_ip := properties.get("ipAddress"):
+                part.master_public_ip = public_ip
+        elif resource_type == "Microsoft.Network/networkInterfaces":
+            private_ip = _nic_private_ip(resource)
+            if not private_ip:
+                continue
+            nic_name = _resource_attr(resource, "name") or ""
+            if match := COMPUTE_NIC_NAME_PATTERN.match(nic_name):
+                compute_ips.append((int(match.group(1)), private_ip))
+            else:
+                part.master_private_ip = private_ip
+
+    compute_ips.sort(key=lambda item: item[0])
+    part.compute_instances_ips = [ip for _, ip in compute_ips]
 
     if failed:
         part.status = "failed"
