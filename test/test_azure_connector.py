@@ -244,7 +244,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         result, resource_group_name = self.connector.create_deployment(
             job_id="job-1",
             partition_name="part1",
-            os_version="ubuntu-hpc/2204",
+            os_version="ubuntu-hpc/2404",
             container_image="registry.example.org/image:tag",
             container_registry_username="user",
             container_registry_password="pass",
@@ -297,7 +297,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
             self.connector.create_deployment(
                 job_id="job-1",
                 partition_name="part1",
-                os_version="ubuntu-hpc/2204",
+                os_version="ubuntu-hpc/2404",
                 container_image="registry.example.org/image:tag",
                 container_registry_username="user",
                 container_registry_password="pass",

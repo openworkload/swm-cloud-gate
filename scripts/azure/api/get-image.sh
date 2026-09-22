@@ -1,7 +1,7 @@
 #!/bin/bash
 
 IMAGE_ID=$1
-#IMAGE_ID=/Subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/Providers/Microsoft.Compute/Locations/eastus/Publishers/Canonical/ArtifactTypes/VMImage/Offers/0001-com-ubuntu-server-jammy/Skus/22_04-lts/Versions/22.04.202407010
+#IMAGE_ID=/Subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/Providers/Microsoft.Compute/Locations/eastus/Publishers/Canonical/ArtifactTypes/VMImage/Offers/0001-com-ubuntu-server-noble/Skus/24_04-lts/Versions/latest
 
 source $(dirname "$0")/helpers.sh
 

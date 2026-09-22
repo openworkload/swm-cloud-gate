@@ -62,10 +62,11 @@
     },
     "osVersion": {
       "type": "string",
-      "defaultValue": "ubuntu-hpc/2204",
+      "defaultValue": "ubuntu-hpc/2404",
       "allowedValues": [
-        "0001-com-ubuntu-server-jammy/22_04-lts",
-        "ubuntu-hpc/2204"
+        "0001-com-ubuntu-server-noble/24_04-lts",
+        "ubuntu-hpc/2404",
+        "ubuntu-24.04"
       ],
       "metadata": {
         "description": "The Linux version for the VM."
@@ -124,17 +125,23 @@
   },
   "variables": {
     "imageReference": {
-      "ubuntu-hpc/2204": {
+      "ubuntu-hpc/2404": {
         "publisher": "microsoft-dsvm",
         "offer": "ubuntu-hpc",
-        "sku": "2204",
-        "version": "22.04.2024102301"
+        "sku": "2404",
+        "version": "latest"
       },
-      "0001-com-ubuntu-server-jammy/22_04-lts": {
+      "0001-com-ubuntu-server-noble/24_04-lts": {
         "publisher": "Canonical",
-        "offer": "0001-com-ubuntu-server-jammy",
-        "sku": "22_04-lts",
-        "version": "22.04.202408010"
+        "offer": "0001-com-ubuntu-server-noble",
+        "sku": "24_04-lts",
+        "version": "latest"
+      },
+      "ubuntu-24.04": {
+        "publisher": "microsoft-dsvm",
+        "offer": "ubuntu-hpc",
+        "sku": "2404",
+        "version": "latest"
       }
     },
     "publicIPAddressName": "[format('{0}-PublicIP', parameters('resourcePrefix'))]",

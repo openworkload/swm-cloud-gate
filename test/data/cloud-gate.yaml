@@ -20,6 +20,6 @@ providers:
     vm_image:
       publisher: "microsoft-dsvm"
       offer: "ubuntu-hpc"
-      skus: "2204"
+      skus: "2404"
     user_ssh_cert: ""
     location: "eastus2"

@@ -12,7 +12,7 @@ HOST=$(hostname -f)
 REQUEST=POST
 
 HEADER1="Accept: application/json"
-HEADER2="osversion: ubuntu-hpc/2204"
+HEADER2="osversion: ubuntu-hpc/2404"
 HEADER3="containerimage: swmregistry.azurecr.io/jupyter/pytorch-notebook:cuda12-hub-5.2.1"
 HEADER4="flavorname: Standard_NC24ads_A100_v4"
 HEADER5="username: taras"

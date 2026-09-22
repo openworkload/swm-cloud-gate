@@ -273,7 +273,7 @@ class TestOpenstackGate(unittest.IsolatedAsyncioTestCase):
             "runtime": "swm_source=http://10.0.2.15/swm-worker.tar.gz",
             "ssh_pub_key": "ssh-rsa ABCDEFGhijklmnop",
             "ports": "10001,10022",
-            "containerimage": "docker://host/ubuntu22.04",
+            "containerimage": "docker://host/ubuntu24.04",
         }
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.post(f"http://{self._hostname}:{self._port}/openstack/partitions") as resp:

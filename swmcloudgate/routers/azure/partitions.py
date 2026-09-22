@@ -116,11 +116,15 @@ async def create_partition(
                     error_messages.append(str(status))
                 if error := data_json.get("error"):
                     if isinstance(error, dict):
+                        if message := error.get("message"):
+                            error_messages.append(str(message))
                         if target := error.get("target"):
                             partition = extract_partition_from_deployment_id(target, status="failed")
                         for detail in error.get("details", []):
-                            if message := detail.get("message"):
+                            if isinstance(detail, dict) and (message := detail.get("message")):
                                 error_messages.append(str(message))
+                    elif error:
+                        error_messages.append(str(error))
 
             LOG.error(f"From Azure:\n{json.dumps(data_json, indent=2)}")
             LOG.debug(f"Partition: {partition}")
