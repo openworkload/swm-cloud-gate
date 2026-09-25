@@ -105,6 +105,11 @@ class Cache:
             file_path.unlink(missing_ok=True)
         except FileNotFoundError as e:
             LOG.debug(f"File not found: {e}")
+        except (ModuleNotFoundError, ImportError, pickle.UnpicklingError, AttributeError) as e:
+            # Stale pickles from an older azure-mgmt-* (or other) package version often
+            # fail to unpickle after an SDK upgrade; drop the file and refetch.
+            LOG.warning(f"Incompatible cache file {file_path}, removing: {e}")
+            file_path.unlink(missing_ok=True)
         return []
 
     def _write(self, file_path: Path, data: list[tuple[datetime, list[str], list[BaseModel]]]) -> None:
