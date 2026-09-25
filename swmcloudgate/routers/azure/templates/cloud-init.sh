@@ -328,6 +328,7 @@ setup_swm_worker() {
 SWM_SNAME=$HOST_NAME
 SWM_PARENT_HOST=$parent_host
 SWM_PARENT_PORT=$parent_port
+SWM_CONTAINER_PODMAN_SOCK=/run/podman/podman.sock
 EOF
     # Compute confdb must be local: entire /opt/swm (incl. spool) is NFS from main,
     # and Mnesia force_load on NFS hangs wm_conf:init forever.
@@ -347,6 +348,7 @@ EOF
 [Service]
 Environment=SWM_PARENT_HOST=$parent_host
 Environment=SWM_PARENT_PORT=$parent_port
+Environment=SWM_CONTAINER_PODMAN_SOCK=/run/podman/podman.sock
 EOF
     else
         cat > /etc/systemd/system/swm.service.d/parent.conf <<EOF
@@ -354,6 +356,7 @@ EOF
 Environment=SWM_PARENT_HOST=$parent_host
 Environment=SWM_PARENT_PORT=$parent_port
 Environment=SWM_MNESIA_DIR=/var/lib/swm/${HOST_NAME}/confdb
+Environment=SWM_CONTAINER_PODMAN_SOCK=/run/podman/podman.sock
 EOF
     fi
     echo $(date) ": /etc/systemd/system/swm.service.d/parent.conf:"
@@ -519,43 +522,54 @@ setup_mounts() {
     mount_azure_storage
 }
 
-setup_docker() {
-    echo $(date) ": setup docker"
+setup_podman() {
+    # SWM job containers use rootful Podman + crun (see swm-core HOWTO/CONTAINERS.md).
+    # Azure HPC images ship Moby/Docker; that is not used by the current worker.
+    echo "$(date): setup rootful Podman + crun"
 
-    # Prefer preinstalled Moby on Azure HPC/GPU images. Only fall back to docker.io
-    # if neither docker nor dockerd is present (do not replace moby in cloud-init packages).
-    if ! command -v docker >/dev/null 2>&1; then
-        export DEBIAN_FRONTEND=noninteractive
-        export NEEDRESTART_MODE=a
-        local apt_lock_opts=(-o DPkg::Lock::Timeout=600)
-        echo "$(date): docker not found; installing docker.io"
-        systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
-        wait_for_dpkg_lock
-        apt-get "${apt_lock_opts[@]}" update
-        wait_for_dpkg_lock
-        apt-get "${apt_lock_opts[@]}" install -y docker.io
-    fi
-    echo "$(date): using docker: $(command -v docker) ($(docker --version 2>/dev/null || true))"
+    export DEBIAN_FRONTEND=noninteractive
+    export NEEDRESTART_MODE=a
+    local apt_lock_opts=(-o DPkg::Lock::Timeout=600)
+    systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
+    wait_for_dpkg_lock
+    apt-get "${apt_lock_opts[@]}" update
+    wait_for_dpkg_lock
+    apt-get "${apt_lock_opts[@]}" install -y podman crun uidmap slirp4netns fuse-overlayfs
 
-    # swm connects to docker via tcp => enable this port listening in the docker daemon:
-    sed -i "/^ExecStart/s/$/ -H tcp:\/\/127.0.0.1:6000 --insecure-registry 172.28.128.2:6006/" /lib/systemd/system/docker.service
-    systemctl daemon-reload
+    echo "$(date): podman=$(podman --version 2>/dev/null || true)"
+    echo "$(date): crun=$(crun --version 2>/dev/null | head -1 || true)"
 
-    # Fix docker connections failures
+    mkdir -p /etc/containers /etc/containers/containers.conf.d
+    cat > /etc/containers/containers.conf.d/50-swm-crun.conf <<'EOF'
+[engine]
+runtime = "crun"
+EOF
+
+    # Avoid systemd-networkd MAC policy issues that historically broke container net.
     # https://github.com/systemd/systemd/issues/3374
-    sed -i s/MACAddressPolicy=persistent/MACAddressPolicy=none/g /lib/systemd/network/99-default.link
-    echo $(date) ": 99-default.link:"
-    cat /lib/systemd/network/99-default.link
-    echo
+    if [[ -f /lib/systemd/network/99-default.link ]]; then
+        sed -i s/MACAddressPolicy=persistent/MACAddressPolicy=none/g /lib/systemd/network/99-default.link
+        echo "$(date): 99-default.link:"
+        cat /lib/systemd/network/99-default.link
+        echo
+    fi
 
-    systemctl enable docker
-    systemctl restart docker
-    if ! systemctl is-active --quiet docker; then
-        echo "$(date): docker.service failed to start" >&2
-        systemctl status docker --no-pager -l || true
+    systemctl enable --now podman.socket
+    if [[ ! -S /run/podman/podman.sock ]]; then
+        echo "$(date): podman.socket did not create /run/podman/podman.sock" >&2
+        systemctl status podman.socket --no-pager -l || true
         return 1
     fi
-    echo "$(date): docker.service is active"
+
+    local runtime
+    # Keep Podman go-template braces out of Jinja via raw block.
+    runtime=$(podman info --format '{% raw %}{{.Host.OCIRuntime.Name}}{% endraw %}' 2>/dev/null || true)
+    echo "$(date): OCI runtime=$runtime sock=/run/podman/podman.sock"
+    if [[ "$runtime" != "crun" ]]; then
+        echo "$(date): expected OCI runtime crun, got: ${runtime:-unknown}" >&2
+        return 1
+    fi
+    echo "$(date): Podman + crun ready"
 }
 
 pull_container_image() {
@@ -569,25 +583,25 @@ pull_container_image() {
     if [ -n "$container_registry_password" ]; then
         printf '%s\n' "$(date): login to the registry: $container_registry"
         printf '%s' "$container_registry_password" \
-            | docker login "$container_registry" \
+            | podman login "$container_registry" \
                 --username "$container_registry_username" \
                 --password-stdin
     fi
     unset container_registry_password
     set -x
 
-    echo $(date) ": pull job container image from container registry: $container_image"
-    docker pull "$container_image"
+    echo "$(date): pull job container image: $container_image"
+    podman pull "$container_image"
 
-    echo $(date) ": all local docker images after the pulling:"
-    docker images
+    echo "$(date): local podman images after pull:"
+    podman images
 }
 
 create_directories
 setup_network
 setup_mounts
 setup_passwordless_root_ssh
-setup_docker
+setup_podman
 pull_container_image
 setup_swm_worker
 

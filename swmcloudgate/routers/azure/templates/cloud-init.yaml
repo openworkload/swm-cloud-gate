@@ -3,10 +3,9 @@ disable_root: false
 # Root/cluster access is key-based only (see setup_passwordless_root_ssh).
 ssh_pwauth: false
 
-# Keep this list minimal. Azure HPC/GPU images already ship Moby Docker;
-# installing docker.io here removes moby-* and races apt with runcmd.
-# Docker is ensured in swm-init.sh (setup_docker). blobfuse2 needs the
-# Microsoft apt repo, so it is also installed from the script.
+# Keep this list minimal. Job containers use rootful Podman + crun, installed
+# in swm-init.sh (setup_podman) to avoid apt races with cloud-init packages.
+# blobfuse2 needs the Microsoft apt repo, so it is installed from the script.
 packages:
   - cgroupfs-mount
   - net-tools

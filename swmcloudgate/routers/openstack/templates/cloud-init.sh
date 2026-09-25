@@ -39,6 +39,7 @@ function download_swm_worker() {
     fi
 
     echo SWM_SNAME=$HOST_NAME > /etc/swm.conf
+    echo SWM_CONTAINER_PODMAN_SOCK=/run/podman/podman.sock >> /etc/swm.conf
     echo $(date) ": /etc/swm.conf:"
     cat /etc/swm.conf
     echo
@@ -114,8 +115,6 @@ function setup_mounts() {
         echo $(date) ": waiting for mount ..."
         until mount -a || (( count++ >= 20 )); do sleep 5; done
         echo $(date) ": mounted."
-
-        systemctl restart docker # fix rare "connection closed" issues
     fi
     echo
 }
@@ -124,41 +123,55 @@ function install_packages() {
     echo $(date) ": install packages"
 
     apt-get --yes update
-    apt-get --yes install docker docker.io
+    apt-get --yes install podman crun uidmap slirp4netns fuse-overlayfs
     apt-get --yes install cgroupfs-mount
-    apt-get --yes install net-tools  # wm_docker.erl uses route utility
+    apt-get --yes install net-tools
 }
 
-function setup_docker() {
-    echo $(date) ": setup docker"
+function setup_podman() {
+    echo $(date) ": setup rootful Podman + crun"
 
-    # swm connects to docker via tcp => enable this port listening in the docker daemon:
-    sed -i '/^ExecStart/s/$/ -H tcp:\/\/127.0.0.1:6000 --insecure-registry 172.28.128.2:6006/' /lib/systemd/system/docker.service
-    systemctl daemon-reload
+    mkdir -p /etc/containers /etc/containers/containers.conf.d
+    cat > /etc/containers/containers.conf.d/50-swm-crun.conf <<'EOF'
+[engine]
+runtime = "crun"
+EOF
 
-    # Fix docker connections failures
     # https://github.com/systemd/systemd/issues/3374
     sed -i s/MACAddressPolicy=persistent/MACAddressPolicy=none/g /lib/systemd/network/99-default.link
     echo $(date) ": 99-default.link:"
     cat /lib/systemd/network/99-default.link
     echo
 
-    systemctl enable docker
-    systemctl restart docker
+    systemctl enable --now podman.socket
+    if [[ ! -S /run/podman/podman.sock ]]; then
+        echo "$(date): podman.socket did not create /run/podman/podman.sock" >&2
+        systemctl status podman.socket --no-pager -l || true
+        return 1
+    fi
+
+    local runtime
+    # Keep Podman go-template braces out of Jinja via raw block.
+    runtime=$(podman info --format '{% raw %}{{.Host.OCIRuntime.Name}}{% endraw %}' 2>/dev/null || true)
+    echo "$(date): OCI runtime=$runtime"
+    if [[ "$runtime" != "crun" ]]; then
+        echo "$(date): expected OCI runtime crun, got: ${runtime:-unknown}" >&2
+        return 1
+    fi
 }
 
 function pull_container_image() {
-    echo $(date) ": pull job container image from container registry: '{{ container_image }}'"
-    docker pull {{ container_image }}
+    echo $(date) ": pull job container image: '{{ container_image }}'"
+    podman pull {{ container_image }}
 
-    echo $(date) ": all local docker images after the pulling:"
-    docker images
+    echo $(date) ": local podman images after pull:"
+    podman images
 }
 
 setup_network
 setup_mounts
 install_packages
-setup_docker
+setup_podman
 pull_container_image
 download_swm_worker
 
