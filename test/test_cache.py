@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 from swmcloudgate import cache
-from swmcloudgate.routers.models import BaseModel
+from swmcloudgate.routers.models import ImageInfo
 
 
 class TestCache(unittest.TestCase):
@@ -23,26 +23,26 @@ class TestCache(unittest.TestCase):
         self.assertIsNone(self._cache.fetch_and_update(["key1", "key2"]))
 
         outdated_timestamp = datetime.now() - timedelta(seconds=self._cache.expire + 1)
-        self._cache._data.append((outdated_timestamp, ["key1", "key2"], [BaseModel()]))
+        self._cache._data.append((outdated_timestamp, ["key1", "key2"], [ImageInfo(id="i", name="n")]))
         self.assertIsNone(self._cache.fetch_and_update(["key1", "key2"]))
 
-        self._cache._data.append((datetime.now(), ["key1", "key2"], [BaseModel()]))
-        self.assertEqual(self._cache.fetch_and_update(["key1", "key2"]), [BaseModel()])
+        self._cache._data.append((datetime.now(), ["key1", "key2"], [ImageInfo(id="i", name="n")]))
+        self.assertEqual(self._cache.fetch_and_update(["key1", "key2"]), [ImageInfo(id="i", name="n")])
 
     def test_update(self):
-        changed, deleted = self._cache.update(["key1", "key2"], [BaseModel()])
+        changed, deleted = self._cache.update(["key1", "key2"], [ImageInfo(id="i", name="n")])
         self.assertEqual(changed, 1)
         self.assertEqual(deleted, 0)
         self.assertEqual(len(self._cache._data), 1)
 
-        changed, deleted = self._cache.update(["key1", "key2"], [BaseModel()])
+        changed, deleted = self._cache.update(["key1", "key2"], [ImageInfo(id="i", name="n")])
         self.assertEqual(changed, 0)
         self.assertEqual(deleted, 0)
         self.assertEqual(len(self._cache._data), 1)
 
         outdated_timestamp = datetime.now() - timedelta(seconds=self._cache.expire + 1)
-        self._cache._data.append((outdated_timestamp, ["key3", "key4"], [BaseModel()]))
-        changed, deleted = self._cache.update(["key3", "key4"], [BaseModel()])
+        self._cache._data.append((outdated_timestamp, ["key3", "key4"], [ImageInfo(id="i", name="n")]))
+        changed, deleted = self._cache.update(["key3", "key4"], [ImageInfo(id="i", name="n")])
         self.assertEqual(changed, 1)
         self.assertEqual(deleted, 1)
         self.assertEqual(len(self._cache._data), 2)
@@ -55,9 +55,9 @@ class TestCache(unittest.TestCase):
         cache_file_path = Path(f"{self._cache_dir}/cloud-gate-test-test_data_kind.dat")
         now = datetime.now()
         with open(cache_file_path, "wb") as file:
-            pickle.dump([(now, ["key1", "key2"], [BaseModel()])], file)
+            pickle.dump([(now, ["key1", "key2"], [ImageInfo(id="i", name="n")])], file)
         data, cache_file_path = self._cache._load_from_filesystem()
-        self.assertEqual(data, [(now, ["key1", "key2"], [BaseModel()])])
+        self.assertEqual(data, [(now, ["key1", "key2"], [ImageInfo(id="i", name="n")])])
         self.assertEqual(cache_file_path, Path(f"{self._cache_dir}/cloud-gate-test-test_data_kind.dat"))
 
     def test_read(self):
@@ -68,17 +68,17 @@ class TestCache(unittest.TestCase):
         now = datetime.now()
         cache_file_path = Path(f"{self._cache_dir}/cloud-gate-test-test_data_kind.dat")
         with open(cache_file_path, "wb") as file:
-            pickle.dump([(now, ["key1", "key2"], [BaseModel()])], file)
+            pickle.dump([(now, ["key1", "key2"], [ImageInfo(id="i", name="n")])], file)
         data = self._cache._read(cache_file_path)
-        self.assertEqual(data, [(now, ["key1", "key2"], [BaseModel()])])
+        self.assertEqual(data, [(now, ["key1", "key2"], [ImageInfo(id="i", name="n")])])
 
     def test_write(self):
         now = datetime.now()
         cache_file_path = Path(f"{self._cache_dir}/cloud-gate-test-test_data_kind.dat")
-        self._cache._write(cache_file_path, [(now, ["key1", "key2"], [BaseModel()])])
+        self._cache._write(cache_file_path, [(now, ["key1", "key2"], [ImageInfo(id="i", name="n")])])
         with open(cache_file_path, "rb") as file:
             data = pickle.load(file)
-        self.assertEqual(data, [(now, ["key1", "key2"], [BaseModel()])])
+        self.assertEqual(data, [(now, ["key1", "key2"], [ImageInfo(id="i", name="n")])])
 
 
 if __name__ == "__main__":

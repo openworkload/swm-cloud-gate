@@ -59,7 +59,7 @@ def load_config(path: str | Path) -> Settings:
     path = Path(path).expanduser()
     with path.open("r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
-    return Settings.parse_obj(data)
+    return Settings.model_validate(data)
 
 
 # Env var override: lets tests (and one-off invocations) point at a different

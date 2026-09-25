@@ -2,6 +2,7 @@ import http
 import typing
 import logging
 import traceback
+from typing import Optional, Annotated
 
 from fastapi import Header, APIRouter, HTTPException
 
@@ -11,12 +12,15 @@ from .converters import convert_to_image
 
 LOG = logging.getLogger("swm")
 CONNECTOR = OpenStackConnector()
-EMPTY_HEADER = Header(None)
 ROUTER = APIRouter()
 
 
 @ROUTER.get("/openstack/images/{id}")
-async def get_image_info(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
+async def get_image_info(
+    id: str,
+    username: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    password: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+):
     try:
         CONNECTOR.reinitialize(username, password, "compute")
         if image := CONNECTOR.find_image(id):
@@ -30,7 +34,10 @@ async def get_image_info(id: str, username: str = EMPTY_HEADER, password: str = 
 
 
 @ROUTER.get("/openstack/images")
-async def list_images(username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
+async def list_images(
+    username: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    password: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+):
     image_list: typing.List[ImageInfo] = []
     try:
         CONNECTOR.reinitialize(username, password, "compute")

@@ -1,15 +1,15 @@
-import json
 import os
+import json
 import shlex
 import unittest
 
 from swmcloudgate.routers.azure.connector import (
-    AzureConnector,
-    HOST_NAME_PLACEHOLDER,
     IS_MAIN_PLACEHOLDER,
+    HOST_NAME_PLACEHOLDER,
+    STORAGE_KEY_B64_PLACEHOLDER,
     MAIN_INSTANCE_HOSTNAME_PLACEHOLDER,
     MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER,
-    STORAGE_KEY_B64_PLACEHOLDER,
+    AzureConnector,
 )
 
 

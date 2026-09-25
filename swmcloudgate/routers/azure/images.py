@@ -1,6 +1,7 @@
 import http
 import logging
 import traceback
+from typing import Optional, Annotated
 
 from fastapi import Body, Header, APIRouter, HTTPException
 
@@ -12,7 +13,6 @@ from .converters import convert_to_image, extract_parameters
 
 LOG = logging.getLogger("swm")
 CONNECTOR = AzureConnector()
-EMPTY_HEADER = Header(None)
 EMPTY_BODY = Body(None)
 ROUTER = APIRouter()
 
@@ -58,7 +58,7 @@ async def get_image_info(
 
 @ROUTER.get("/azure/images")
 async def list_images(
-    extra: str = EMPTY_HEADER,
+    extra: Annotated[Optional[str], Header(convert_underscores=False)] = None,
     body: HttpBody = EMPTY_BODY,
 ) -> dict[str, str | list[ImageInfo]]:
     try:

@@ -28,7 +28,7 @@ Default listen address: `https://<fqdn>:8444`
 
 # Requirements
 
-* Python 3.10
+* Python 3.12
 * Sky Port TLS material under `/opt/swm/spool/secure/` (node + cluster certs)
 * Provider credentials in `~/.swm/cloud-gate.yaml` (copy from `config/cloud-gate.yaml`)
 

@@ -29,11 +29,11 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-import argparse
 import os
 import ssl
-import socket
 import sys
+import socket
+import argparse
 from pathlib import Path
 
 import requests

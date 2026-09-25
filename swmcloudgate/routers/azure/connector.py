@@ -1,10 +1,11 @@
 import os
 import re
-import json
 import copy
+import json
+import shlex
+import types
 import typing
 import logging
-import shlex
 
 import jinja2
 from azure.identity import CertificateCredential
@@ -493,17 +494,20 @@ class AzureConnector(BaseConnector):
         images: list[VirtualMachineImage] = []
         if "images" in self._test_responses:
             for it in self._test_responses["images"]:
-                vm_image = VirtualMachineImage(
-                    id=it["id"],
-                    name=it["name"],
-                    location=it["extra"]["location"],
-                    publisher=it["extra"]["publisher"],
-                    offer=it["extra"]["offer"],
-                    skus=it["extra"]["skus"],
-                    version=it["extra"]["version"],
+                # azure-mgmt-compute>=33 removed ctor kwargs like publisher/offer.
+                # Tests only need attributes used by convert_to_image().
+                images.append(
+                    types.SimpleNamespace(
+                        id=it["id"],
+                        name=it["name"],
+                        location=it["extra"]["location"],
+                        tags=it["extra"].get("tags"),
+                        additional_properties={},
+                        # Keep empty: convert_to_image historically only used .extra /
+                        # additional_properties, not publisher/offer ctor fields.
+                        extra={},
+                    )
                 )
-                vm_image.extra = {}
-                images.append(vm_image)
             return images
 
         LOG.debug(f"List images: location={location}, publisher={publisher}, offer={offer}, skus={skus}")
@@ -755,18 +759,15 @@ class AzureConnector(BaseConnector):
                     f"Offers/{offer}/Skus/{sku}/Versions/{version}"
                 )
                 if img_id == it["id"]:
-                    vm_image = VirtualMachineImage(
+                    return types.SimpleNamespace(
                         id=img_id,
                         name=it["name"],
                         location=location,
-                        publisher=publisher,
-                        offer=offer,
-                        skus=sku,
-                        version=version,
+                        tags=None,
+                        additional_properties={},
+                        extra={},
                     )
-                    vm_image.extra = {}
-                    return vm_image
-            return {}
+            return None
         if azure_image := self._compute_client.virtual_machine_images.get(
             location=location,
             publisher_name=publisher,

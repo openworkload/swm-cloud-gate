@@ -71,13 +71,15 @@ def convert_to_image(data: VirtualMachineImage) -> ImageInfo:
     image = ImageInfo(
         id=data.id,
         name=data.name,
-        extra={"tags": data.tags, "location": data.location},
+        extra={"tags": getattr(data, "tags", None), "location": getattr(data, "location", None)},
     )
-    for name, value in data.additional_properties.items():
-        image.extra[name] = value
+    additional = getattr(data, "additional_properties", None) or {}
+    if hasattr(additional, "items"):
+        for name, value in additional.items():
+            image.extra[name] = value
     offer: str | None = None
     sku: str | None = None
-    for name, value in data.extra.items():
+    for name, value in (getattr(data, "extra", None) or {}).items():
         image.extra[name] = value
         if name == "offer":
             offer = value

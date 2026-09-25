@@ -1,11 +1,9 @@
 # Base requirements:
 aiohttp
-asyncio
-asynctest
 autoflake
 bandit
 black
-fastapi==0.63.0  # latest version (0.108.0 for now) is broken: confuses headers
+fastapi
 flake8
 flake8-bugbear
 isort
@@ -16,13 +14,9 @@ pydantic
 python-dotenv
 jinja2
 ruff
-uvicorn >= 0.34.2
+uvicorn
 twine
 wheel
-
-
-# Fix unsatisfied dependency on dataclasses 0.8 issue
-dataclasses==0.6
 
 # OpenStack integration requirements:
 apache-libcloud>=3.6.1
@@ -30,6 +24,6 @@ apache-libcloud>=3.6.1
 # Azure integration requirements:
 azure-core
 azure-identity
-azure-mgmt-resource
+azure-mgmt-resource>=23.0.1,<25
 azure-mgmt-commerce
 azure-mgmt-compute >= 32.0.0

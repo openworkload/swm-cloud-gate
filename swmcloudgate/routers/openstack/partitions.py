@@ -1,6 +1,7 @@
 import http
 import typing
 import logging
+from typing import Optional, Annotated
 
 from fastapi import Header, APIRouter, HTTPException
 
@@ -9,25 +10,24 @@ from .connector import OpenStackConnector
 from .converters import convert_to_partition
 
 CONNECTOR = OpenStackConnector()
-EMPTY_HEADER = Header(None)
 LOG = logging.getLogger("swm")
 ROUTER = APIRouter()
 
 
 @ROUTER.post("/openstack/partitions")
 async def create_partition(
-    username: str = EMPTY_HEADER,
-    password: str = EMPTY_HEADER,
-    tenantname: str = EMPTY_HEADER,
-    partname: str = EMPTY_HEADER,
-    vmimage: str = EMPTY_HEADER,
-    flavorname: str = EMPTY_HEADER,
-    keyname: str = EMPTY_HEADER,
-    count: str = EMPTY_HEADER,
-    jobid: str = EMPTY_HEADER,
-    runtime: str = EMPTY_HEADER,
-    ports: str = EMPTY_HEADER,
-    containerimage: str = EMPTY_HEADER,
+    username: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    password: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    tenantname: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    partname: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    vmimage: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    flavorname: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    keyname: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    count: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    jobid: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    runtime: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    ports: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    containerimage: Annotated[Optional[str], Header(convert_underscores=False)] = None,
 ):
     CONNECTOR.reinitialize(username, password, "orchestration")
     result = CONNECTOR.create_stack(
@@ -56,19 +56,26 @@ async def create_partition(
 
 
 @ROUTER.get("/openstack/partitions")
-async def list_partitions(username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
+async def list_partitions(
+    username: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    password: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+):
     CONNECTOR.reinitialize(username, password, "orchestration")
     partitions: typing.List[PartInfo] = []
     for stack in CONNECTOR.list_stacks():
         if "id" not in stack or "stack_name" not in stack:
-            LOG.warn(f"Returned stack information is incomplete: {stack}")
+            LOG.warning(f"Returned stack information is incomplete: {stack}")
             continue
         partitions.append(convert_to_partition(stack))
     return {"partitions": partitions}
 
 
 @ROUTER.get("/openstack/partitions/{id}")
-async def get_partition_info(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
+async def get_partition_info(
+    id: str,
+    username: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    password: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+):
     CONNECTOR.reinitialize(username, password, "orchestration")
     if stack := CONNECTOR.get_stack(id):
         return convert_to_partition(stack)
@@ -79,7 +86,11 @@ async def get_partition_info(id: str, username: str = EMPTY_HEADER, password: st
 
 
 @ROUTER.delete("/openstack/partitions/{id}")
-async def delete_partition(id: str, username: str = EMPTY_HEADER, password: str = EMPTY_HEADER):
+async def delete_partition(
+    id: str,
+    username: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    password: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+):
     CONNECTOR.reinitialize(username, password, "orchestration")
     result = CONNECTOR.delete_stack(id)
     return {"result": result}

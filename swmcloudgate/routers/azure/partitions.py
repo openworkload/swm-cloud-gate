@@ -3,6 +3,7 @@ import json
 import typing
 import logging
 import traceback
+from typing import Optional, Annotated
 
 from fastapi import Body, Header, APIRouter, HTTPException
 from azure.core.exceptions import HttpResponseError
@@ -16,22 +17,21 @@ from .converters import convert_to_partition, extract_partition_from_deployment_
 LOG = logging.getLogger("swm")
 CONNECTOR = AzureConnector()
 ROUTER = APIRouter()
-EMPTY_HEADER = Header(None)
 EMPTY_BODY = Body(None)
 
 
 @ROUTER.post("/azure/partitions")
 async def create_partition(
-    osversion: str = EMPTY_HEADER,
-    containerimage: str = EMPTY_HEADER,
-    flavorname: str = EMPTY_HEADER,
-    username: str = EMPTY_HEADER,
-    count: str = EMPTY_HEADER,
-    jobid: str = EMPTY_HEADER,
-    partname: str = EMPTY_HEADER,
-    runtime: str = EMPTY_HEADER,
-    location: str = EMPTY_HEADER,
-    ports: str = EMPTY_HEADER,
+    osversion: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    containerimage: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    flavorname: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    username: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    count: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    jobid: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    partname: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    runtime: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    location: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    ports: Annotated[Optional[str], Header(convert_underscores=False)] = None,
     body: HttpBody = EMPTY_BODY,
 ):
     try:

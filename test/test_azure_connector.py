@@ -1,9 +1,9 @@
-import json
 import os
+import json
 import unittest
 from unittest.mock import Mock
 
-from swmcloudgate.routers.azure.connector import AzureConnector, MAX_VM_COUNT
+from swmcloudgate.routers.azure.connector import MAX_VM_COUNT, AzureConnector
 
 
 class TestAzureConnectorMultiNode(unittest.TestCase):

@@ -1,5 +1,5 @@
-# Match pyproject.toml requires-python (~=3.10). CI installs 3.10 via setup-python.
-PYTHON ?= python3.10
+# Match pyproject.toml requires-python (~=3.12). CI installs 3.12 via setup-python.
+PYTHON ?= python3.12
 RUNTEST=$(PYTHON) -m unittest -v -b
 VENV_BIN=.venv/bin
 ALLMODULES=$(patsubst %.py, %.py, $(wildcard test_*.py))
@@ -17,7 +17,7 @@ prepare-venv:
 check:
 	$(VENV_BIN)/flake8 swmcloudgate test
 	$(VENV_BIN)/black --check --diff --exclude .venv swmcloudgate test
-	$(VENV_BIN)/ruff swmcloudgate test
+	$(VENV_BIN)/ruff check swmcloudgate test
 	$(VENV_BIN)/bandit -r swmcloudgate -c "pyproject.toml" --silent
 
 .PHONY: format
