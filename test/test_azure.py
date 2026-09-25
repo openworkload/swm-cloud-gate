@@ -65,6 +65,7 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         self.proc.join(timeout=5)
         os.environ.pop("SWM_TEST_CONFIG", None)
         os.environ.pop("SWM_GATE_CONFIG", None)
+
     async def test_list_flavors(self):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.get(

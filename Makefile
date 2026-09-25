@@ -1,4 +1,5 @@
-PYTHON=python3.10
+# Match pyproject.toml requires-python (~=3.10). CI installs 3.10 via setup-python.
+PYTHON ?= python3.10
 RUNTEST=$(PYTHON) -m unittest -v -b
 VENV_BIN=.venv/bin
 ALLMODULES=$(patsubst %.py, %.py, $(wildcard test_*.py))

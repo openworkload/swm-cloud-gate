@@ -189,7 +189,10 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         self.assertIn("systemctl enable nfs-kernel-server", cloud_init_script)
         self.assertIn('echo "$MAIN_INSTANCE_PRIVATE_IP:/home /home nfs', cloud_init_script)
         self.assertIn('echo "$MAIN_INSTANCE_PRIVATE_IP:$SWM_ROOT $SWM_ROOT nfs', cloud_init_script)
-        self.assertIn('echo "$SWM_ROOT $PRIVATE_SUBNET_CIDR(rw,async,no_root_squash,no_subtree_check)"', cloud_init_script)
+        self.assertIn(
+            'echo "$SWM_ROOT $PRIVATE_SUBNET_CIDR(rw,async,no_root_squash,no_subtree_check)"',
+            cloud_init_script,
+        )
         self.assertIn("wait_for_shared_swm_root", cloud_init_script)
         self.assertIn('mountpoint -q "$SWM_ROOT"', cloud_init_script)
         self.assertIn("compute node uses NFS-shared", cloud_init_script)
@@ -221,11 +224,11 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         self.assertIn('if [ -n "$container_registry_password" ]; then', cloud_init_script)
         self.assertIn("--password-stdin", cloud_init_script)
         self.assertIn(
-            'docker login "$container_registry"',
+            'podman login "$container_registry"',
             cloud_init_script,
         )
         self.assertNotIn('--password "$container_registry_password"', cloud_init_script)
-        self.assertIn('docker pull "$container_image"', cloud_init_script)
+        self.assertIn('podman pull "$container_image"', cloud_init_script)
         self.assertNotIn("pa&amp;ss&lt;word&gt;", cloud_init_script)
 
     def test_create_deployment_builds_multi_node_template(self):

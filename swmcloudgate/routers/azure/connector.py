@@ -97,9 +97,7 @@ class AzureConnector(BaseConnector):
     def _validate_admin_username(self, username: str) -> None:
         """Validate Linux-compatible admin username used in authorized_keys path."""
         if not ADMIN_USERNAME_PATTERN.fullmatch(username or ""):
-            raise ValueError(
-                f"Invalid admin username '{username}': must match {ADMIN_USERNAME_PATTERN.pattern}"
-            )
+            raise ValueError(f"Invalid admin username '{username}': must match {ADMIN_USERNAME_PATTERN.pattern}")
 
     def _get_deployment_properties(
         self,

@@ -62,12 +62,12 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
         )
         self.assertIn("--password-stdin", cloud_init_script)
         self.assertIn(
-            'docker login "$container_registry"',
+            'podman login "$container_registry"',
             cloud_init_script,
         )
         self.assertNotIn('--password "$container_registry_password"', cloud_init_script)
         self.assertNotIn(
-            "docker login registry.example.org --username user --password user<&>\"'pass",
+            "podman login registry.example.org --username user --password user<&>\"'pass",
             cloud_init_script,
         )
         self.assertIn(
