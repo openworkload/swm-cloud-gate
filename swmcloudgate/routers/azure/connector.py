@@ -561,6 +561,7 @@ class AzureConnector(BaseConnector):
         storage_container: str,
         runtime_params: dict[str, str],
         user_ssh_cert: str,
+        install_checkpoint_tools: bool = False,
     ) -> str:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(  # nosec B701 - shellquote secures interpolated shell values here
@@ -583,6 +584,7 @@ class AzureConnector(BaseConnector):
             is_main=IS_MAIN_PLACEHOLDER,
             main_instance_hostname=MAIN_INSTANCE_HOSTNAME_PLACEHOLDER,
             main_instance_private_ip=MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER,
+            install_checkpoint_tools=bool(install_checkpoint_tools),
         )
         return script
 
@@ -667,6 +669,7 @@ class AzureConnector(BaseConnector):
         location: str,
         ports: str,
         user_ssh_cert: str,
+        install_checkpoint_tools: bool = False,
     ) -> tuple[DeploymentExtended, str]:
         resource_group_name = self._get_resource_group_name(partition_name)
         vm_count = self._parse_vm_count(count)
@@ -698,6 +701,7 @@ class AzureConnector(BaseConnector):
             storage_container,
             runtime_params,
             user_ssh_cert,
+            install_checkpoint_tools=install_checkpoint_tools,
         )
 
         deployment_name = self._get_deployment_name(partition_name)

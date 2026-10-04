@@ -20,6 +20,12 @@ ROUTER = APIRouter()
 EMPTY_BODY = Body(None)
 
 
+def _header_flag_true(value: Optional[str]) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
+
 @ROUTER.post("/azure/partitions")
 async def create_partition(
     osversion: Annotated[Optional[str], Header(convert_underscores=False)] = None,
@@ -32,9 +38,11 @@ async def create_partition(
     runtime: Annotated[Optional[str], Header(convert_underscores=False)] = None,
     location: Annotated[Optional[str], Header(convert_underscores=False)] = None,
     ports: Annotated[Optional[str], Header(convert_underscores=False)] = None,
+    installcheckpointtools: Annotated[Optional[str], Header(convert_underscores=False)] = None,
     body: HttpBody = EMPTY_BODY,
 ):
     try:
+        install_checkpoint_tools = _header_flag_true(installcheckpointtools)
         LOG.info(f"Create Azure partition for job {jobid}")
         LOG.debug("Partition creation options:")
         LOG.debug(f" * partition: {partname}")
@@ -46,6 +54,7 @@ async def create_partition(
         LOG.debug(f" * runtime: {runtime}")
         LOG.debug(f" * location: {location}")
         LOG.debug(f" * ports: {ports}")
+        LOG.debug(f" * install checkpoint tools: {install_checkpoint_tools}")
 
         settings = config.get_settings()
 
@@ -92,6 +101,7 @@ async def create_partition(
             location,
             ports,
             user_ssh_cert,
+            install_checkpoint_tools=install_checkpoint_tools,
         )
         if result:
             return {"partition": convert_to_partition(result, resource_group_name)}

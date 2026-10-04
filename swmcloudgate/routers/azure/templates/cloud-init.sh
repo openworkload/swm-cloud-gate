@@ -597,12 +597,62 @@ pull_container_image() {
     podman images
 }
 
+# Install MANA (pulls DMTCP) under /opt/mana when the job requested checkpointing.
+# Azure ubuntu-hpc/2404 does not ship these tools. Idempotent: skip if present.
+install_mana_dmtcp() {
+    local install_checkpoint_tools={{ install_checkpoint_tools | default(false) | string | lower }}
+    local mana_prefix=/opt/mana
+    local src_dir=/opt/src/mana
+    local apt_lock_opts=(-o DPkg::Lock::Timeout=600)
+
+    if [[ "$install_checkpoint_tools" != "true" ]]; then
+        echo "$(date): checkpoint tools not requested -- skip MANA/DMTCP install"
+        return 0
+    fi
+
+    if [[ -x "${mana_prefix}/bin/mana_launch" ]]; then
+        echo "$(date): MANA already installed at ${mana_prefix} -- skip"
+        return 0
+    fi
+
+    echo "$(date): installing MANA/DMTCP into ${mana_prefix} (job requested checkpointing)"
+    export DEBIAN_FRONTEND=noninteractive
+    export NEEDRESTART_MODE=a
+    systemctl stop apt-daily.service apt-daily-upgrade.service unattended-upgrades.service 2>/dev/null || true
+    wait_for_dpkg_lock
+    apt-get "${apt_lock_opts[@]}" update
+    wait_for_dpkg_lock
+    apt-get "${apt_lock_opts[@]}" install -y \
+        build-essential cmake git automake autoconf libtool \
+        libpython3-dev python3
+
+    mkdir -p /opt/src
+    if [[ ! -d "${src_dir}/.git" ]]; then
+        rm -rf "${src_dir}"
+        git clone --depth 1 --recurse-submodules \
+            https://github.com/mpickpt/mana.git "${src_dir}"
+    fi
+
+    cd "${src_dir}"
+    ./configure --prefix="${mana_prefix}"
+    make -j"$(nproc)"
+    make install
+
+    if [[ ! -x "${mana_prefix}/bin/mana_launch" ]]; then
+        echo "$(date): MANA install failed -- mana_launch missing under ${mana_prefix}/bin" >&2
+        return 1
+    fi
+    echo "$(date): MANA/DMTCP installed: $(command -v "${mana_prefix}/bin/mana_launch" || true)"
+    "${mana_prefix}/bin/mana_launch" --version 2>/dev/null || true
+}
+
 create_directories
 setup_network
 setup_mounts
 setup_passwordless_root_ssh
 setup_podman
 pull_container_image
+install_mana_dmtcp
 setup_swm_worker
 
 echo

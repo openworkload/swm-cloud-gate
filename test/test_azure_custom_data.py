@@ -27,7 +27,7 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
         with open("swmcloudgate/routers/azure/templates/partition.json") as template_file:
             return json.load(template_file)
 
-    def _render_cloud_init_script(self):
+    def _render_cloud_init_script(self, install_checkpoint_tools: bool = False):
         return self.connector._get_cloud_init_script(
             job_id="job-1",
             container_image="registry.example.org/image:tag",
@@ -38,6 +38,7 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             storage_container="storagecontainer",
             runtime_params={"swm_source": "ssh"},
             user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC== user@example",
+            install_checkpoint_tools=install_checkpoint_tools,
         )
 
     def test_cloud_init_script_uses_explicit_main_instance_placeholders(self):
@@ -86,6 +87,15 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
         self.assertIn('local job_dir="/opt/swm/spool/job/job-1"', cloud_init_script)
         self.assertIn('ln -s "$swm_log_dir" /var/log/swm', cloud_init_script)
         self.assertIn('ln -s "$job_dir" /var/log/job', cloud_init_script)
+        self.assertIn("install_mana_dmtcp", cloud_init_script)
+        self.assertIn("checkpoint tools not requested -- skip MANA/DMTCP install", cloud_init_script)
+
+    def test_cloud_init_installs_mana_when_checkpoint_requested(self):
+        cloud_init_script = self._render_cloud_init_script(install_checkpoint_tools=True)
+        self.assertIn("install_mana_dmtcp", cloud_init_script)
+        self.assertIn('install_checkpoint_tools=true', cloud_init_script)
+        self.assertIn("https://github.com/mpickpt/mana.git", cloud_init_script)
+        self.assertIn('mana_prefix=/opt/mana', cloud_init_script)
 
     def test_main_vm_custom_data_replaces_placeholders_via_arm(self):
         template = self._load_template()
