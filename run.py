@@ -12,10 +12,12 @@ def main():
     my_dir = os.path.dirname(os.path.abspath(__file__))
     # Default to fewer workers so large Azure responses do not OOM small hosts.
     workers = int(os.environ.get("SWM_GATE_WORKERS", "2"))
+    # SWM_GATE_HOST overrides bind address (mocked CT uses 127.0.0.1).
+    host = os.environ.get("SWM_GATE_HOST") or socket.getfqdn()
     uvicorn.run(
         "swmcloudgate.main:app",
         log_config=f"{my_dir}/swmcloudgate/logging.yaml",
-        host=socket.getfqdn(),
+        host=host,
         port=8444,
         reload=False,
         workers=workers,
