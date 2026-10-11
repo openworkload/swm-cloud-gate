@@ -38,6 +38,8 @@ Default listen address: `https://<fqdn>:8444`
 * Provider credentials in `~/.swm/cloud-gate.yaml` (copy from `config/cloud-gate.yaml`)
 
 For Azure setup (service principal, storage, registry), see [HOWTO/AZURE.md](HOWTO/AZURE.md).
+For OpenStack (Keystone HTTPS, project credentials, TLS verify), see
+[HOWTO/OPENSTACK.md](HOWTO/OPENSTACK.md) and [HOWTO/SECURITY.md](HOWTO/SECURITY.md).
 
 # Setup
 
@@ -50,7 +52,7 @@ Copy and edit the config:
 ```bash
 mkdir -p ~/.swm
 cp config/cloud-gate.yaml ~/.swm/cloud-gate.yaml
-# fill providers.azure (or openstack) credentials
+# fill providers.azure and/or providers.openstack credentials
 ```
 
 # Run
@@ -81,6 +83,8 @@ swmcloudgate/
   routers/openstack/      # OpenStack / Heat connector and templates
 config/cloud-gate.yaml    # Config template
 HOWTO/AZURE.md            # Azure account and credentials guide
+HOWTO/OPENSTACK.md        # OpenStack Keystone and TLS settings
+HOWTO/SECURITY.md         # mTLS and OpenStack credential rules
 test/                     # Unit tests
 ```
 

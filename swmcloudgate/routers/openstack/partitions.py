@@ -5,13 +5,18 @@ from typing import Optional, Annotated
 
 from fastapi import Header, APIRouter, HTTPException
 
+from .auth import OpenStackAuthError, resolve_openstack_credentials
 from ..models import PartInfo
 from .connector import OpenStackConnector
 from .converters import convert_to_partition
 
-CONNECTOR = OpenStackConnector()
 LOG = logging.getLogger("swm")
 ROUTER = APIRouter()
+
+
+def _connector(username: Optional[str], password: Optional[str], service: str) -> OpenStackConnector:
+    user, passwd = resolve_openstack_credentials(username, password)
+    return OpenStackConnector(user, passwd, service)
 
 
 @ROUTER.post("/openstack/partitions")
@@ -29,8 +34,11 @@ async def create_partition(
     ports: Annotated[Optional[str], Header(convert_underscores=False)] = None,
     containerimage: Annotated[Optional[str], Header(convert_underscores=False)] = None,
 ):
-    CONNECTOR.reinitialize(username, password, "orchestration")
-    result = CONNECTOR.create_stack(
+    try:
+        connector = _connector(username, password, "orchestration")
+    except OpenStackAuthError as e:
+        raise HTTPException(status_code=http.client.UNAUTHORIZED, detail=str(e)) from e
+    result = connector.create_stack(
         tenantname,
         partname,
         vmimage,
@@ -60,9 +68,12 @@ async def list_partitions(
     username: Annotated[Optional[str], Header(convert_underscores=False)] = None,
     password: Annotated[Optional[str], Header(convert_underscores=False)] = None,
 ):
-    CONNECTOR.reinitialize(username, password, "orchestration")
+    try:
+        connector = _connector(username, password, "orchestration")
+    except OpenStackAuthError as e:
+        raise HTTPException(status_code=http.client.UNAUTHORIZED, detail=str(e)) from e
     partitions: typing.List[PartInfo] = []
-    for stack in CONNECTOR.list_stacks():
+    for stack in connector.list_stacks():
         if "id" not in stack or "stack_name" not in stack:
             LOG.warning(f"Returned stack information is incomplete: {stack}")
             continue
@@ -76,8 +87,11 @@ async def get_partition_info(
     username: Annotated[Optional[str], Header(convert_underscores=False)] = None,
     password: Annotated[Optional[str], Header(convert_underscores=False)] = None,
 ):
-    CONNECTOR.reinitialize(username, password, "orchestration")
-    if stack := CONNECTOR.get_stack(id):
+    try:
+        connector = _connector(username, password, "orchestration")
+    except OpenStackAuthError as e:
+        raise HTTPException(status_code=http.client.UNAUTHORIZED, detail=str(e)) from e
+    if stack := connector.get_stack(id):
         return convert_to_partition(stack)
     raise HTTPException(
         status_code=http.client.NOT_FOUND,
@@ -91,6 +105,9 @@ async def delete_partition(
     username: Annotated[Optional[str], Header(convert_underscores=False)] = None,
     password: Annotated[Optional[str], Header(convert_underscores=False)] = None,
 ):
-    CONNECTOR.reinitialize(username, password, "orchestration")
-    result = CONNECTOR.delete_stack(id)
+    try:
+        connector = _connector(username, password, "orchestration")
+    except OpenStackAuthError as e:
+        raise HTTPException(status_code=http.client.UNAUTHORIZED, detail=str(e)) from e
+    result = connector.delete_stack(id)
     return {"result": result}

@@ -45,8 +45,20 @@ class AzureProvider(BaseModel):
     location: str = "eastus2"
 
 
+class OpenStackProvider(BaseModel):
+    auth_url: str = ""
+    username: str = ""
+    password: str = ""
+    project_name: str = ""
+    domain_name: str = "Default"
+    verify_ssl: bool = True
+    ca_cert: str = ""
+    allow_insecure_http: bool = False
+
+
 class Providers(BaseModel):
     azure: AzureProvider = AzureProvider()
+    openstack: OpenStackProvider = OpenStackProvider()
 
 
 class Settings(BaseModel):

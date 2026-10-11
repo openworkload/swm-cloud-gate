@@ -1,0 +1,34 @@
+version: 1
+
+base:
+  cache_expire: 7200000
+  cache_dir: "~/.swm/spool/cache"
+
+providers:
+  azure:
+    api_credentials:
+      subscription_id: "00000000-0000-0000-0000-000000000000"
+      tenant_id: "00000000-0000-0000-0000-000000000001"
+      app_id: "00000000-0000-0000-0000-000000000002"
+    container_registry:
+      user: ""
+      password: ""
+    storage:
+      account: ""
+      key: ""
+      container: ""
+    vm_image:
+      publisher: ""
+      offer: ""
+      skus: ""
+    user_ssh_cert: ""
+    location: "eastus2"
+  openstack:
+    auth_url: "https://keystone.test:5000"
+    username: ""
+    password: ""
+    project_name: "demo"
+    domain_name: "Default"
+    verify_ssl: true
+    ca_cert: ""
+    allow_insecure_http: false

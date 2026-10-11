@@ -1,3 +1,4 @@
+import os
 import http
 import uuid
 import typing
@@ -14,6 +15,7 @@ from libcloud.common.openstack import OpenStackResponse
 from libcloud.compute.providers import get_driver
 from libcloud.compute.drivers.openstack import OpenStackNodeSize
 
+from .auth import OpenStackAuthError, load_openstack_provider
 from ..baseconnector import BaseConnector
 
 LOG = logging.getLogger("swm")
@@ -25,29 +27,57 @@ SERVICE_NAMES = {"compute": "nova", "orchestration": "heat", "rating": "cloudkit
 class OpenStackConnector(BaseConnector):
     def __init__(self, username: str = None, password: str = None, service: str = None):
         self._driver = None
-        self._init_driver(username, password, service)
         super().__init__("openstack")
+        if service is not None:
+            self._init_driver(username, password, service)
 
     def reinitialize(self, username: str, password: str, service: str) -> None:
         self._init_driver(username, password, service)
 
     def _init_driver(self, username: str, password: str, service: str) -> None:
+        # Always drop any prior session before validating the new request.
+        self._driver = None
+
+        user = (username or "").strip()
+        passwd = (password or "").strip()
+        if not user or not passwd or not service:
+            raise OpenStackAuthError("OpenStack username, password, and service are required")
+
+        # Mocked unit tests validate credentials but do not call Keystone.
+        if os.getenv("SWM_TEST_CONFIG", None):
+            return
+
+        cfg = load_openstack_provider()
+        auth_url = (cfg.auth_url or "").strip()
+        if not auth_url:
+            raise OpenStackAuthError("OpenStack auth_url is not configured")
+        if auth_url.startswith("http://") and not cfg.allow_insecure_http:
+            raise OpenStackAuthError("OpenStack auth_url must use HTTPS")
+        if not (auth_url.startswith("https://") or auth_url.startswith("http://")):
+            raise OpenStackAuthError("OpenStack auth_url must be an absolute HTTP(S) URL")
+
+        project_name = (cfg.project_name or "").strip()
+        if not project_name:
+            raise OpenStackAuthError("OpenStack project_name is not configured")
+
         # See also https://libcloud.readthedocs.io/en/stable/compute/drivers/openstack.html
-        if username and password and service:
-            libcloud.security.VERIFY_SSL_CERT = False
-            OpenStack = get_driver(Provider.OPENSTACK)
-            url = "http://172.28.128.254:5000"
-            LOG.info(f"Connect to OpenStack: {url}")
-            self._driver = OpenStack(
-                username,
-                password,
-                ex_tenant_name="demo1",
-                ex_domain_name="Default",
-                ex_force_service_type=service,
-                ex_force_service_name=SERVICE_NAMES[service],
-                ex_force_auth_url=url,
-                ex_force_auth_version="3.x_password",
-            )
+        libcloud.security.VERIFY_SSL_CERT = bool(cfg.verify_ssl)
+        ca_cert = (cfg.ca_cert or "").strip()
+        if ca_cert:
+            libcloud.security.CA_CERTS_PATH = ca_cert
+
+        OpenStack = get_driver(Provider.OPENSTACK)
+        LOG.info(f"Connect to OpenStack: {auth_url}")
+        self._driver = OpenStack(
+            user,
+            passwd,
+            ex_tenant_name=project_name,
+            ex_domain_name=(cfg.domain_name or "Default").strip() or "Default",
+            ex_force_service_type=service,
+            ex_force_service_name=SERVICE_NAMES[service],
+            ex_force_auth_url=auth_url,
+            ex_force_auth_version="3.x_password",
+        )
 
     def list_sizes(self):
         if "sizes" in self._test_responses:

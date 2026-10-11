@@ -23,3 +23,12 @@ providers:
       skus: "2404"
     user_ssh_cert: ""
     location: "eastus2"
+  openstack:
+    auth_url: "https://keystone.example:5000"
+    username: ""
+    password: ""
+    project_name: ""
+    domain_name: "Default"
+    verify_ssl: true
+    ca_cert: ""
+    allow_insecure_http: false
