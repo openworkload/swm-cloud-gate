@@ -5,19 +5,18 @@ import logging
 import traceback
 from typing import Optional, Annotated
 
-from fastapi import Body, Header, APIRouter, HTTPException
+from fastapi import Header, APIRouter, HTTPException
 from azure.core.exceptions import HttpResponseError
 
 from swmcloudgate import config
 
-from ..models import HttpBody, PartInfo
+from ..models import PartInfo
 from .connector import AzureConnector
 from .converters import convert_to_partition, extract_partition_from_deployment_id
 
 LOG = logging.getLogger("swm")
 CONNECTOR = AzureConnector()
 ROUTER = APIRouter()
-EMPTY_BODY = Body(None)
 
 
 def _header_flag_true(value: Optional[str]) -> bool:
@@ -39,7 +38,6 @@ async def create_partition(
     location: Annotated[Optional[str], Header(convert_underscores=False)] = None,
     ports: Annotated[Optional[str], Header(convert_underscores=False)] = None,
     installcheckpointtools: Annotated[Optional[str], Header(convert_underscores=False)] = None,
-    body: HttpBody = EMPTY_BODY,
 ):
     try:
         install_checkpoint_tools = _header_flag_true(installcheckpointtools)
@@ -82,7 +80,7 @@ async def create_partition(
         storage_container = settings.providers.azure.storage.container
         user_ssh_cert = settings.providers.azure.user_ssh_cert
 
-        CONNECTOR.reinitialize(subscription_id, tenant_id, app_id, body.pem_data)
+        CONNECTOR.reinitialize(subscription_id, tenant_id, app_id)
 
         result, resource_group_name = CONNECTOR.create_deployment(
             jobid,
@@ -152,9 +150,7 @@ async def create_partition(
 
 
 @ROUTER.get("/azure/partitions")
-async def list_partitions(
-    body: HttpBody = EMPTY_BODY,
-):
+async def list_partitions():
     try:
         settings = config.get_settings()
 
@@ -175,7 +171,7 @@ async def list_partitions(
             LOG.warning(msg)
             return {"error": msg}
 
-        CONNECTOR.reinitialize(subscription_id, tenant_id, app_id, body.pem_data)
+        CONNECTOR.reinitialize(subscription_id, tenant_id, app_id)
 
         partitions: typing.List[PartInfo] = []
         for resource_group_info in CONNECTOR.list_resource_groups():
@@ -192,7 +188,6 @@ async def list_partitions(
 async def get_partition_by_id(
     subscriptionid: str,
     partitionname: str,
-    body: HttpBody = EMPTY_BODY,
 ):
     try:
         settings = config.get_settings()
@@ -209,7 +204,7 @@ async def get_partition_by_id(
             LOG.warning(msg)
             return {"error": msg}
 
-        CONNECTOR.reinitialize(subscriptionid, tenant_id, app_id, body.pem_data)
+        CONNECTOR.reinitialize(subscriptionid, tenant_id, app_id)
         if result := CONNECTOR.get_resource_group(partitionname):
             return convert_to_partition(result, partitionname)
 
@@ -226,7 +221,6 @@ async def get_partition_by_id(
 @ROUTER.get("/azure/partitions/{partitionname}")
 async def get_partition_by_name(
     partitionname: str,
-    body: HttpBody = EMPTY_BODY,
 ):
     try:
         settings = config.get_settings()
@@ -248,7 +242,7 @@ async def get_partition_by_name(
             LOG.warning(msg)
             return {"error": msg}
 
-        CONNECTOR.reinitialize(subscription_id, tenant_id, app_id, body.pem_data)
+        CONNECTOR.reinitialize(subscription_id, tenant_id, app_id)
 
         resource_group_name = partitionname + "-resource-group"
         if result := CONNECTOR.get_resource_group(resource_group_name):
@@ -267,7 +261,6 @@ async def get_partition_by_name(
 async def delete_partition(
     subscriptionid: str,
     resourcegroup: str,
-    body: HttpBody = EMPTY_BODY,
 ):
     try:
         settings = config.get_settings()
@@ -284,7 +277,7 @@ async def delete_partition(
             LOG.warning(msg)
             return {"error": msg}
 
-        CONNECTOR.reinitialize(subscriptionid, tenant_id, app_id, body.pem_data)
+        CONNECTOR.reinitialize(subscriptionid, tenant_id, app_id)
         if result := CONNECTOR.delete_resource_group(resourcegroup):
             return {"result": result}
 

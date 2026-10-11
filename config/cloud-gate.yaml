@@ -10,6 +10,7 @@ providers:
       subscription_id: ""
       tenant_id: ""
       app_id: ""
+      certificate_path: ""
     container_registry:
       user: ""
       password: ""

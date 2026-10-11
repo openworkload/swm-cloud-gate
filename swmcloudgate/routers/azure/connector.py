@@ -17,6 +17,7 @@ from azure.mgmt.compute.models import VirtualMachineSize, VirtualMachineImage
 from azure.mgmt.resource.resources.models import DeploymentMode, DeploymentExtended
 
 from swmcloudgate import cache
+from swmcloudgate.azure_cert import AzureCertificateError, load_azure_certificate_data
 
 from ..baseconnector import BaseConnector
 
@@ -49,36 +50,40 @@ class AzureConnector(BaseConnector):
         subscription_id: str,
         tenant_id: str,
         app_id: str,
-        pem_data: bytes,
     ) -> None:
-        self._init_azure_clients(subscription_id, tenant_id, app_id, pem_data)
+        self._init_azure_clients(subscription_id, tenant_id, app_id)
 
     def _init_azure_clients(
         self,
         subscription_id: str,
         tenant_id: str,
         app_id: str,
-        pem_data: bytes,
     ) -> None:
         self._subscription_id = subscription_id
+        self._compute_client = None
+        self._resource_client = None
+        self._commerce_client = None
+        self._subscription = None
         if os.getenv("SWM_TEST_CONFIG", None):
             return
-        if subscription_id and tenant_id and app_id and len(pem_data):
-            credential = CertificateCredential(
-                tenant_id=tenant_id,
-                client_id=app_id,
-                certificate_data=pem_data,
+        if not (subscription_id and tenant_id and app_id):
+            raise Exception(
+                "Not enough parameters provided to initialize Azure connection: "
+                f"{subscription_id}, {tenant_id}, {app_id}"
             )
-            self._compute_client = ComputeManagementClient(credential, subscription_id)
-            self._resource_client = ResourceManagementClient(credential, subscription_id)
-            self._commerce_client = UsageManagementClient(credential, subscription_id)
-            self._subscription = SubscriptionClient(credential).subscriptions.get(subscription_id)
-        else:
-            msg = (
-                "Not enough parameters provided to initialize Azure connection:"
-                f"{subscription_id}, {tenant_id}, {app_id}, {len(pem_data)}"
-            )
-            raise Exception(msg)
+        try:
+            pem_data = load_azure_certificate_data()
+        except AzureCertificateError as exc:
+            raise Exception(str(exc)) from exc
+        credential = CertificateCredential(
+            tenant_id=tenant_id,
+            client_id=app_id,
+            certificate_data=pem_data,
+        )
+        self._compute_client = ComputeManagementClient(credential, subscription_id)
+        self._resource_client = ResourceManagementClient(credential, subscription_id)
+        self._commerce_client = UsageManagementClient(credential, subscription_id)
+        self._subscription = SubscriptionClient(credential).subscriptions.get(subscription_id)
 
     def _parse_vm_count(self, count_param: str | None) -> int:
         """Parse and validate VM count parameter."""

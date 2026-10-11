@@ -3,17 +3,16 @@ import logging
 import traceback
 from typing import Optional, Annotated
 
-from fastapi import Body, Header, APIRouter, HTTPException
+from fastapi import Header, APIRouter, HTTPException
 
 from swmcloudgate import config
 
-from ..models import HttpBody, ImageInfo
+from ..models import ImageInfo
 from .connector import AzureConnector
 from .converters import convert_to_image, extract_parameters
 
 LOG = logging.getLogger("swm")
 CONNECTOR = AzureConnector()
-EMPTY_BODY = Body(None)
 ROUTER = APIRouter()
 
 
@@ -29,7 +28,6 @@ async def get_image_info(
     offer: str,
     skus: str,
     version: str,
-    body: HttpBody = EMPTY_BODY,
 ) -> ImageInfo:
     try:
         settings = config.get_settings()
@@ -45,7 +43,7 @@ async def get_image_info(
             LOG.warning(msg)
             return {"error": msg}
 
-        CONNECTOR.reinitialize(subscriptionid, tenant_id, app_id, body.pem_data)
+        CONNECTOR.reinitialize(subscriptionid, tenant_id, app_id)
         if image := CONNECTOR.find_image(location, publisher, offer, skus, version):
             return convert_to_image(image)
     except Exception as e:
@@ -59,7 +57,6 @@ async def get_image_info(
 @ROUTER.get("/azure/images")
 async def list_images(
     extra: Annotated[Optional[str], Header(convert_underscores=False)] = None,
-    body: HttpBody = EMPTY_BODY,
 ) -> dict[str, str | list[ImageInfo]]:
     try:
         extra_map = extract_parameters(extra)
@@ -101,7 +98,7 @@ async def list_images(
             LOG.warning(msg)
             return {"error": msg}
 
-        CONNECTOR.reinitialize(subscription_id, tenant_id, app_id, body.pem_data)
+        CONNECTOR.reinitialize(subscription_id, tenant_id, app_id)
         image_list: list[ImageInfo] = []
 
         for image in CONNECTOR.list_images(location, publisher, offer, skus):

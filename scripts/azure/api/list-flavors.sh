@@ -5,7 +5,6 @@ source $(dirname "$0")/helpers.sh
 CERT=$HOME/.swm/spool/secure/node/cert.pem
 KEY=$HOME/.swm/spool/secure/node/key.pem
 CA=$HOME/.swm/spool/secure/cluster/ca-chain-cert.pem
-PEM_DATA=$(make_pem_data $CERT $KEY)
 
 PORT=8444
 HOST=$(hostname -f)
@@ -14,7 +13,6 @@ REQUEST=GET
 HEADER1="Accept: application/json"
 HEADER2="extra: location=eastus2"
 URL="https://${HOST}:${PORT}/azure/flavors"
-BODY='{"pem_data": '${PEM_DATA}'}'
 
 json=$(curl --request ${REQUEST}\
      --cacert ${CA}\
@@ -22,7 +20,6 @@ json=$(curl --request ${REQUEST}\
      --key ${KEY}\
      --header "${HEADER1}"\
      --header "${HEADER2}"\
-     --data-raw "${BODY}" \
      ${URL} 2>/dev/null)
 
 table=$(echo "$json" | jq -r '.flavors[] | [.id, .name, .cpus, .gpus, .price] | @tsv')

@@ -129,9 +129,27 @@ class TestTlsConfig(unittest.TestCase):
     def test_uvicorn_ssl_kwargs_require_client_cert(self) -> None:
         kwargs = uvicorn_ssl_kwargs("/opt/swm/spool/secure")
         self.assertEqual(kwargs["ssl_cert_reqs"], ssl.CERT_REQUIRED)
-        self.assertEqual(kwargs["ssl_ca_certs"], "/opt/swm/spool/secure/cluster/cert.pem")
+        # Prefer ca-chain when present (grid + cluster); OpenSSL cannot verify
+        # node client certs against the intermediate cluster cert alone.
+        chain = "/opt/swm/spool/secure/cluster/ca-chain-cert.pem"
+        expected_ca = chain if os.path.isfile(chain) else "/opt/swm/spool/secure/cluster/cert.pem"
+        self.assertEqual(kwargs["ssl_ca_certs"], expected_ca)
         self.assertEqual(kwargs["ssl_certfile"], "/opt/swm/spool/secure/node/cert.pem")
         self.assertEqual(kwargs["ssl_keyfile"], "/opt/swm/spool/secure/node/key.pem")
+
+    def test_client_trust_prefers_ca_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            secure = Path(tmp) / "secure"
+            (secure / "cluster").mkdir(parents=True)
+            (secure / "cluster" / "cert.pem").write_text("CERT\n", encoding="ascii")
+            from swmcloudgate.tls import client_trust_ca_file
+
+            self.assertEqual(client_trust_ca_file(str(secure)), str(secure / "cluster" / "cert.pem"))
+            (secure / "cluster" / "ca-chain-cert.pem").write_text("CHAIN\n", encoding="ascii")
+            self.assertEqual(
+                client_trust_ca_file(str(secure)),
+                str(secure / "cluster" / "ca-chain-cert.pem"),
+            )
 
     def test_client_cert_allowed_fingerprint(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

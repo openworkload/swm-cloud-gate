@@ -51,24 +51,6 @@ HOST = socket.getfqdn()
 PORT = 8444
 
 
-def make_pem_data(cert_path: str, key_path: str) -> str:
-    with open(key_path, "r") as key_file:
-        content1 = key_file.read()
-    cert_lines = []
-    inside_cert = False
-    with open(cert_path, "r") as cert_file:
-        for line in cert_file:
-            if "-----BEGIN CERTIFICATE-----" in line:
-                inside_cert = True
-            if inside_cert:
-                cert_lines.append(line)
-            if "-----END CERTIFICATE-----" in line:
-                inside_cert = False
-    content2 = "".join(cert_lines)
-    joined_content = content1 + content2
-    return joined_content
-
-
 def main() -> None:
     settings = config.get_settings()
     parser = argparse.ArgumentParser(description="Warm Azure flavors/images caches via the local cloud gate.")
@@ -87,11 +69,9 @@ def main() -> None:
     offer = settings.providers.azure.vm_image.offer
     location = args.location
 
-    pem_data = make_pem_data(CERT, KEY)
-
     try:
-        list_flavors(subscription_id, tenant_id, app_id, pem_data, location)
-        list_images(subscription_id, tenant_id, app_id, publisher, offer, pem_data, location)
+        list_flavors(subscription_id, tenant_id, app_id, location)
+        list_images(subscription_id, tenant_id, app_id, publisher, offer, location)
     except requests.exceptions.RequestException as e:
         print(f"\nERROR: {e}", file=sys.stderr)
         sys.exit(1)
@@ -103,7 +83,7 @@ class TLS13Adapter(HTTPAdapter):
         self.poolmanager = PoolManager(*args, ssl_context=ctx, **kwargs)
 
 
-def list_flavors(subscription_id: str, tenant_id: str, app_id: str, pem_data: str, location: str) -> None:
+def list_flavors(subscription_id: str, tenant_id: str, app_id: str, location: str) -> None:
     url = f"https://{HOST}:{PORT}/azure/flavors"
     headers = {
         "Accept": "application/json",
@@ -112,14 +92,11 @@ def list_flavors(subscription_id: str, tenant_id: str, app_id: str, pem_data: st
         "appid": app_id,
         "extra": f"location={location}",
     }
-    body = {"pem_data": pem_data}
-
     session = requests.Session()
     session.mount("https://", TLS13Adapter())
     response = session.get(
         url,
         headers=headers,
-        json=body,
         cert=(CERT, KEY),
         verify=CA,
         timeout=600,
@@ -136,7 +113,6 @@ def list_images(
     app_id: str,
     publisher: str,
     offer: str,
-    pem_data: str,
     location: str,
 ) -> None:
     url = f"https://{HOST}:{PORT}/azure/images"
@@ -147,14 +123,12 @@ def list_images(
         "appid": app_id,
         "extra": f"location={location};publisher={publisher};offer={offer}",
     }
-    body = {"pem_data": pem_data}
 
     session = requests.Session()
     session.mount("https://", TLS13Adapter())
     response = session.get(
         url,
         headers=headers,
-        json=body,
         cert=(CERT, KEY),
         verify=CA,
         timeout=600,

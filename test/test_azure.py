@@ -70,7 +70,6 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.get(
                 url=f"http://{self._hostname}:{self._port}/azure/flavors",
-                json={"pem_data": "test"},
             ) as resp:
                 try:
                     data = await resp.json()
@@ -106,7 +105,6 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.get(
                 url=f"http://{self._hostname}:{self._port}/azure/partitions",
-                json={"pem_data": "test"},
             ) as resp:
                 try:
                     data = await resp.json()
@@ -153,7 +151,6 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(
                 url=f"http://{self._hostname}:{self._port}/azure/images",
-                json={"pem_data": "test"},
             ) as resp:
                 try:
                     data = await resp.json()
@@ -190,7 +187,6 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
                     f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
                     "/resourceGroups/rg1-resource-group"
                 ),
-                json={"pem_data": "test"},
             ) as resp:
                 try:
                     data = await resp.json()
@@ -218,7 +214,6 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
                     f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
                     "/resourceGroups/foo-resource-group"
                 ),
-                json={"pem_data": "test"},
             ) as resp:
                 try:
                     data = await resp.json()
@@ -240,7 +235,6 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(
                 url=f"http://{self._hostname}:{self._port}/azure/images/{img_id}",
-                json={"pem_data": "test"},
             ) as resp:
                 try:
                     data = await resp.json()
@@ -267,7 +261,6 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.get(
                 url=f"http://{self._hostname}:{self._port}/azure/images/{img_id}",
-                json={"pem_data": "test"},
             ) as resp:
                 try:
                     data = await resp.json()
@@ -279,7 +272,6 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.delete(
                 url=f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo/resourceGroups/rg1",
-                json={"pem_data": "test"},
             ) as resp:
                 try:
                     data = await resp.json()
@@ -291,7 +283,6 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.delete(
                 url=f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo/resourceGroups/bar",
-                json={"pem_data": "test"},
             ) as resp:
                 try:
                     data = await resp.json()
@@ -321,7 +312,6 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.post(
                 url=f"http://{self._hostname}:{self._port}/azure/partitions",
-                json={"pem_data": "test"},
             ) as resp:
                 try:
                     data = await resp.json()
@@ -352,7 +342,6 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.post(
                 url=f"http://{self._hostname}:{self._port}/azure/partitions",
-                json={"pem_data": "test"},
             ) as resp:
                 self.assertEqual(resp.status, 400)
                 try:

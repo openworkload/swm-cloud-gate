@@ -17,6 +17,9 @@ class AzureApiCredentials(BaseModel):
     subscription_id: str = ""  # allow empty; can enforce non-empty in prod
     tenant_id: str = ""
     app_id: str = ""
+    # Optional path to a PEM file (private key + certificate) for Azure AD.
+    # When empty, the gate uses $SPOOL/node/{key,cert}.pem.
+    certificate_path: str = ""
 
 
 class AzureContainerRegistry(BaseModel):

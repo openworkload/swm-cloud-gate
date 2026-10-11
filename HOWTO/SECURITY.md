@@ -6,8 +6,12 @@ The HTTPS listener (`run.py` / `swmcloudgate.start`) uses:
 
 | File | Role |
 |------|------|
-| `$SPOOL/cluster/cert.pem` | Trust store for **client** certificates (`ssl_ca_certs`) |
+| `$SPOOL/cluster/ca-chain-cert.pem` (preferred) or `cert.pem` | Trust store for **client** certificates (`ssl_ca_certs`) |
 | `$SPOOL/node/cert.pem` + `key.pem` | Gate **server** identity |
+
+Use the CA chain when the cluster certificate is an intermediate under a grid
+root. OpenSSL fails client verification with only the intermediate
+(`unable to get issuer certificate`) and closes the TLS session.
 
 `$SPOOL` defaults to `/opt/swm/spool/secure`. Set `SWM_GATE_SPOOL` or `SWM_SPOOL`
 (then `$SWM_SPOOL/secure`) to override.
@@ -16,10 +20,24 @@ Client certificates are **required** (`ssl.CERT_REQUIRED`). Sky Port
 (`wm_gate`) presents the node certificate. Clients without a cert cannot
 complete the handshake.
 
-Any certificate signed by the cluster CA can satisfy the handshake. Prefer
-keeping user private keys off hosts that can reach the gate port. Application
-fingerprint helpers live in `swmcloudgate.tls.client_cert_allowed` for further
-pinning when the ASGI stack exposes the peer certificate.
+When the ASGI scope exposes the peer certificate (uvicorn peercert patch),
+middleware pins the fingerprint to `$SPOOL/node/cert.pem` (override with
+`SWM_GATE_ALLOWED_CLIENT_CERT`). A mismatch returns HTTP 403. If peercert is
+not in the scope (for example TestClient), the pin is skipped; handshake
+`CERT_REQUIRED` still applies for HTTPS.
+
+Do **not** send node private keys in HTTP bodies. Sky Port authenticates with
+mTLS only.
+
+## Azure service principal certificate
+
+Azure `CertificateCredential` uses gate-local PEM material:
+
+1. `providers.azure.api_credentials.certificate_path` when set in
+   `cloud-gate.yaml`, or
+2. `$SPOOL/node/key.pem` + `$SPOOL/node/cert.pem` by default.
+
+Request bodies must not carry private keys.
 
 ## OpenStack credentials and TLS
 

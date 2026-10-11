@@ -29,7 +29,3 @@ class Flavor(BaseModel):
     mem: int
     storage: int
     price: float
-
-
-class HttpBody(BaseModel):
-    pem_data: bytes
