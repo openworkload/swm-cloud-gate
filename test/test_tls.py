@@ -134,7 +134,15 @@ class TestTlsConfig(unittest.TestCase):
         chain = "/opt/swm/spool/secure/cluster/ca-chain-cert.pem"
         expected_ca = chain if os.path.isfile(chain) else "/opt/swm/spool/secure/cluster/cert.pem"
         self.assertEqual(kwargs["ssl_ca_certs"], expected_ca)
-        self.assertEqual(kwargs["ssl_certfile"], "/opt/swm/spool/secure/node/cert.pem")
+        # Node cert.pem may include an openssl text prefix; kwargs use a cleaned PEM.
+        certfile = kwargs["ssl_certfile"]
+        self.assertTrue(
+            certfile == "/opt/swm/spool/secure/node/cert.pem"
+            or (certfile.startswith("/tmp/swm-gate-cert-") and certfile.endswith(".pem")),
+            certfile,
+        )
+        with open(certfile, encoding="ascii") as fh:
+            self.assertTrue(fh.read().lstrip().startswith("-----BEGIN CERTIFICATE-----"))
         self.assertEqual(kwargs["ssl_keyfile"], "/opt/swm/spool/secure/node/key.pem")
 
     def test_client_trust_prefers_ca_chain(self) -> None:

@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Callable, Awaitable
+from typing import Any, Awaitable, Callable
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse
 
 from .tls import client_cert_allowed, spool_secure_dir
 
 LOGGER = logging.getLogger("swm")
+
+Receive = Callable[[], Awaitable[dict[str, Any]]]
+Send = Callable[[dict[str, Any]], Awaitable[None]]
 
 
 def peer_cert_der_from_scope(scope: dict[str, Any]) -> bytes | None:
@@ -35,19 +36,31 @@ def allowed_client_cert_path() -> str:
     return os.path.join(spool_secure_dir(), "node", "cert.pem")
 
 
-class ClientCertPinMiddleware(BaseHTTPMiddleware):
-    """When the ASGI scope exposes a peer cert, require it match the node cert.
+class ClientCertPinMiddleware:
+    """Pure ASGI middleware: pin peer cert fingerprint to the node cert when visible.
+
+    Uses a plain ASGI wrapper (not Starlette BaseHTTPMiddleware) to avoid
+    known request-hang issues with uvicorn workers under mTLS.
 
     If peercert is absent (TestClient, or uvicorn without the peercert patch),
     the request proceeds. Handshake ``CERT_REQUIRED`` still applies for HTTPS.
     """
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-        der = peer_cert_der_from_scope(request.scope)
+    def __init__(self, app: Callable) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict[str, Any], receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        der = peer_cert_der_from_scope(scope)
         if der is None:
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
         path = allowed_client_cert_path()
         if not client_cert_allowed(der, path):
             LOGGER.warning("Rejected client certificate (fingerprint mismatch)")
-            return JSONResponse({"detail": "client certificate not allowed"}, status_code=403)
-        return await call_next(request)
+            response = JSONResponse({"detail": "client certificate not allowed"}, status_code=403)
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)

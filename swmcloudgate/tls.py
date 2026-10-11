@@ -10,6 +10,7 @@ import hashlib
 import logging
 import os
 import ssl
+import tempfile
 from typing import Any
 
 LOGGER = logging.getLogger("swm")
@@ -42,11 +43,28 @@ def client_trust_ca_file(spool_secure: str) -> str:
     return os.path.join(spool_secure, "cluster", "cert.pem")
 
 
+def _ssl_certfile_path(cert_path: str) -> str:
+    """Return a PEM path safe for ssl.load_cert_chain (strip openssl text prefix)."""
+    with open(cert_path, "rb") as fh:
+        raw = fh.read()
+    text = raw.decode("ascii", errors="strict")
+    if text.lstrip().startswith("-----BEGIN CERTIFICATE-----"):
+        return cert_path
+    clean = _first_cert_pem_block(text)
+    fd, tmp = tempfile.mkstemp(prefix="swm-gate-cert-", suffix=".pem")
+    try:
+        os.write(fd, clean.encode("ascii"))
+    finally:
+        os.close(fd)
+    LOGGER.info("Using cleaned node cert PEM at %s (source had non-PEM prefix)", tmp)
+    return tmp
+
+
 def uvicorn_ssl_kwargs(spool_secure: str | None = None) -> dict[str, Any]:
     """Keyword args for ``uvicorn.run`` enabling server TLS + required client certs."""
     spool = spool_secure or spool_secure_dir()
     ca = client_trust_ca_file(spool)
-    cert = os.path.join(spool, "node", "cert.pem")
+    cert = _ssl_certfile_path(os.path.join(spool, "node", "cert.pem"))
     key = os.path.join(spool, "node", "key.pem")
     return {
         "ssl_version": ssl.PROTOCOL_TLS_SERVER,
