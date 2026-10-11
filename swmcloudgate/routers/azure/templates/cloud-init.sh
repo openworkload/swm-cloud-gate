@@ -254,6 +254,8 @@ setup_swm_worker() {
     if [[ "$IS_MAIN" != "true" ]]; then
         echo "$(date): compute node uses NFS-shared $SWM_ROOT from main (skip worker archive unpack)"
         wait_for_shared_swm_root
+        # Cookie is created when the daemon starts (systemd); setup only needs paths.
+        export SWM_COOKIE_OPTIONAL=1
         source /opt/swm/*/scripts/swm.env
         ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py \
             -v ${SWM_VERSION} \
@@ -285,6 +287,8 @@ setup_swm_worker() {
         done
 
         mkdir -p /opt/swm/spool
+        # Cookie is created when the daemon starts (systemd); setup only needs paths.
+        export SWM_COOKIE_OPTIONAL=1
         source /opt/swm/*/scripts/swm.env
 
         ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py \
@@ -301,6 +305,8 @@ setup_swm_worker() {
         tar zfx ./swm-worker.tar.gz --directory /opt/swm/
         popd
         mkdir -p /opt/swm/spool
+        # Cookie is created when the daemon starts (systemd); setup only needs paths.
+        export SWM_COOKIE_OPTIONAL=1
         source /opt/swm/*/scripts/swm.env
         ${SWM_ROOT}/${SWM_VERSION}/scripts/setup-swm-core.py \
             -v ${SWM_VERSION} \

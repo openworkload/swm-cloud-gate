@@ -25,6 +25,8 @@ function download_swm_worker() {
             fi
         done
 
+        # Cookie is created when the daemon starts; setup only needs paths.
+        export SWM_COOKIE_OPTIONAL=1
         source /opt/swm/0.2.0/scripts/swm.env
 
         ${SWM_ROOT}/${SWM_VERSION}/scripts/setup.linux -p ${SWM_ROOT} -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup-config.linux

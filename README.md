@@ -22,14 +22,19 @@ Source: [github.com/openworkload/swm-cloud-gate](https://github.com/openworkload
 - Exposes HTTPS REST APIs for cloud partitions, flavors, and images
 - Renders provider templates (ARM / Heat) and cloud-init for job VMs
 - Talks to Azure (service principal + certificate) or OpenStack (libcloud)
-- Runs with mutual TLS using Sky Port node/cluster certificates
+- Runs with **mutual TLS**: the listener requires a client certificate issued by
+  the Sky Port cluster CA (uvicorn `ssl_cert_reqs=CERT_REQUIRED`). Sky Port
+  presents `secure/node/{cert,key}.pem`. Connections without a client cert fail
+  the TLS handshake.
 
 Default listen address: `https://<fqdn>:8444`
 
 # Requirements
 
 * Python 3.12
-* Sky Port TLS material under `/opt/swm/spool/secure/` (node + cluster certs)
+* Sky Port TLS material under `/opt/swm/spool/secure/` (node + cluster certs).
+  Override the secure directory with `SWM_GATE_SPOOL` or `SWM_SPOOL` (uses
+  `$SWM_SPOOL/secure`).
 * Provider credentials in `~/.swm/cloud-gate.yaml` (copy from `config/cloud-gate.yaml`)
 
 For Azure setup (service principal, storage, registry), see [HOWTO/AZURE.md](HOWTO/AZURE.md).
