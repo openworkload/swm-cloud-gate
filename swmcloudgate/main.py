@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import FastAPI
 
@@ -15,7 +16,9 @@ LOGGER = logging.getLogger("swm")
 LOGGER.setLevel(logging.DEBUG)
 
 # Workers import this module; patch uvicorn before any request is handled.
-uvicorn_peercert.install()
+# Mocked CT sets SWM_GATE_DISABLE_PEER_CERT_PATCH=1 (handshake CERT_REQUIRED remains).
+if os.environ.get("SWM_GATE_DISABLE_PEER_CERT_PATCH", "").strip() not in ("1", "true", "yes"):
+    uvicorn_peercert.install()
 
 app = FastAPI(debug=True)
 app.add_middleware(ClientCertPinMiddleware)
