@@ -6,7 +6,6 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from swmcloudgate.azure_cert import AzureCertificateError, load_azure_certificate_data
 from swmcloudgate.config import get_settings

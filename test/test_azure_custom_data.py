@@ -93,9 +93,9 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
     def test_cloud_init_installs_mana_when_checkpoint_requested(self):
         cloud_init_script = self._render_cloud_init_script(install_checkpoint_tools=True)
         self.assertIn("install_mana_dmtcp", cloud_init_script)
-        self.assertIn('install_checkpoint_tools=true', cloud_init_script)
+        self.assertIn("install_checkpoint_tools=true", cloud_init_script)
         self.assertIn("https://github.com/mpickpt/mana.git", cloud_init_script)
-        self.assertIn('mana_prefix=/opt/mana', cloud_init_script)
+        self.assertIn("mana_prefix=/opt/mana", cloud_init_script)
 
     def test_main_vm_custom_data_replaces_placeholders_via_arm(self):
         template = self._load_template()

@@ -43,9 +43,7 @@ def load_azure_certificate_data() -> bytes:
         with open(key_path, "rb") as key_fh, open(cert_path, "rb") as cert_fh:
             data = key_fh.read() + cert_fh.read()
     except OSError as exc:
-        raise AzureCertificateError(
-            f"Cannot read Azure cert from spool ({key_path}, {cert_path}): {exc}"
-        ) from exc
+        raise AzureCertificateError(f"Cannot read Azure cert from spool ({key_path}, {cert_path}): {exc}") from exc
     if not data:
         raise AzureCertificateError("Azure spool node key/cert are empty")
     return data

@@ -2,29 +2,29 @@
 
 from __future__ import annotations
 
+import os
+import ssl
+import time
+import socket
 import asyncio
 import datetime
+import tempfile
+import unittest
 import ipaddress
 import multiprocessing
-import os
-import socket
-import ssl
-import tempfile
-import time
-import unittest
 from pathlib import Path
 
 import aiohttp
 import uvicorn
 from cryptography import x509
+from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.x509.oid import NameOID
 
 from swmcloudgate.tls import (
+    uvicorn_ssl_kwargs,
     client_cert_allowed,
     cert_sha256_fingerprint_pem,
-    uvicorn_ssl_kwargs,
 )
 
 
@@ -127,23 +127,32 @@ def _run_uvicorn(host: str, port: int, spool_secure: str) -> None:
 
 class TestTlsConfig(unittest.TestCase):
     def test_uvicorn_ssl_kwargs_require_client_cert(self) -> None:
-        kwargs = uvicorn_ssl_kwargs("/opt/swm/spool/secure")
-        self.assertEqual(kwargs["ssl_cert_reqs"], ssl.CERT_REQUIRED)
-        # Prefer ca-chain when present (grid + cluster); OpenSSL cannot verify
-        # node client certs against the intermediate cluster cert alone.
-        chain = "/opt/swm/spool/secure/cluster/ca-chain-cert.pem"
-        expected_ca = chain if os.path.isfile(chain) else "/opt/swm/spool/secure/cluster/cert.pem"
-        self.assertEqual(kwargs["ssl_ca_certs"], expected_ca)
-        # Node cert.pem may include an openssl text prefix; kwargs use a cleaned PEM.
-        certfile = kwargs["ssl_certfile"]
-        self.assertTrue(
-            certfile == "/opt/swm/spool/secure/node/cert.pem"
-            or (certfile.startswith("/tmp/swm-gate-cert-") and certfile.endswith(".pem")),
-            certfile,
-        )
-        with open(certfile, encoding="ascii") as fh:
-            self.assertTrue(fh.read().lstrip().startswith("-----BEGIN CERTIFICATE-----"))
-        self.assertEqual(kwargs["ssl_keyfile"], "/opt/swm/spool/secure/node/key.pem")
+        # Use a temp spool so CI (no /opt/swm) and local hosts both work.
+        with tempfile.TemporaryDirectory() as tmp:
+            secure = Path(tmp) / "secure"
+            (secure / "cluster").mkdir(parents=True)
+            (secure / "node").mkdir(parents=True)
+            # Minimal PEM frames; uvicorn_ssl_kwargs only checks framing for certfile.
+            node_cert = "-----BEGIN CERTIFICATE-----\n" "MIIB\n" "-----END CERTIFICATE-----\n"
+            (secure / "cluster" / "cert.pem").write_text("CA\n", encoding="ascii")
+            (secure / "node" / "cert.pem").write_text(node_cert, encoding="ascii")
+            (secure / "node" / "key.pem").write_text("KEY\n", encoding="ascii")
+            kwargs = uvicorn_ssl_kwargs(str(secure))
+            self.assertEqual(kwargs["ssl_cert_reqs"], ssl.CERT_REQUIRED)
+            self.assertEqual(kwargs["ssl_ca_certs"], str(secure / "cluster" / "cert.pem"))
+            certfile = kwargs["ssl_certfile"]
+            self.assertTrue(
+                certfile == str(secure / "node" / "cert.pem")
+                or (certfile.startswith("/tmp/swm-gate-cert-") and certfile.endswith(".pem")),
+                certfile,
+            )
+            with open(certfile, encoding="ascii") as fh:
+                self.assertTrue(fh.read().lstrip().startswith("-----BEGIN CERTIFICATE-----"))
+            self.assertEqual(kwargs["ssl_keyfile"], str(secure / "node" / "key.pem"))
+
+            (secure / "cluster" / "ca-chain-cert.pem").write_text("CHAIN\n", encoding="ascii")
+            kwargs2 = uvicorn_ssl_kwargs(str(secure))
+            self.assertEqual(kwargs2["ssl_ca_certs"], str(secure / "cluster" / "ca-chain-cert.pem"))
 
     def test_client_trust_prefers_ca_chain(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -246,7 +255,7 @@ class TestTlsHandshake(unittest.IsolatedAsyncioTestCase):
         connector = aiohttp.TCPConnector(ssl=self._client_ssl(with_cert=False))
         async with aiohttp.ClientSession(connector=connector) as session:
             try:
-                async with session.get(url) as _resp:
+                async with session.get(url):
                     self.fail("expected TLS handshake failure without client cert")
             except (
                 aiohttp.ClientConnectorError,
@@ -261,7 +270,7 @@ class TestTlsHandshake(unittest.IsolatedAsyncioTestCase):
         connector = aiohttp.TCPConnector(ssl=self._client_ssl(wrong_ca=True))
         async with aiohttp.ClientSession(connector=connector) as session:
             try:
-                async with session.get(url) as _resp:
+                async with session.get(url):
                     self.fail("expected TLS handshake failure with wrong client CA")
             except (
                 aiohttp.ClientConnectorError,

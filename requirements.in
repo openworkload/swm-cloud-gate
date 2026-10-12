@@ -6,6 +6,8 @@ black
 fastapi
 flake8
 flake8-bugbear
+# Starlette TestClient (fastapi.testclient) requires httpx2.
+httpx2
 isort
 mypy >= 0.981
 pyyaml
