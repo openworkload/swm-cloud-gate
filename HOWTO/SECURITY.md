@@ -49,6 +49,11 @@ On the VM, cloud-init writes the bootstrap script to
 `/var/lib/swm/bootstrap/swm-init.sh` with mode `0700`. The script removes
 itself on `EXIT` so registry and storage secrets do not remain on filesystem.
 
+Shared registry credentials (`user` / `password`) are used only when the job
+image registry host matches `providers.azure.container_registry.server`.
+Foreign registry hosts are rejected at partition create (HTTP 400). Short-lived
+or per-registry pull tokens remain a follow-up.
+
 ## OpenStack credentials and TLS
 
 Set `providers.openstack` in `~/.swm/cloud-gate.yaml`:

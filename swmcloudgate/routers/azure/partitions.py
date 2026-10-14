@@ -73,6 +73,7 @@ async def create_partition(
             LOG.warning(msg)
             return {"error": msg}
 
+        container_registry_server = settings.providers.azure.container_registry.server
         container_registry_user = settings.providers.azure.container_registry.user
         container_registry_password = settings.providers.azure.container_registry.password
         storage_account = settings.providers.azure.storage.account
@@ -100,6 +101,7 @@ async def create_partition(
             ports,
             user_ssh_cert,
             install_checkpoint_tools=install_checkpoint_tools,
+            container_registry_server=container_registry_server,
         )
         if result:
             return {"partition": convert_to_partition(result, resource_group_name)}

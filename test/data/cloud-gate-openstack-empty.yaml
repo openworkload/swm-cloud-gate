@@ -11,6 +11,7 @@ providers:
       tenant_id: "00000000-0000-0000-0000-000000000001"
       app_id: "00000000-0000-0000-0000-000000000002"
     container_registry:
+      server: ""
       user: ""
       password: ""
     storage:

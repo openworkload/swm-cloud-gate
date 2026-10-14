@@ -37,6 +37,46 @@ STORAGE_KEY_B64_PLACEHOLDER = "__SWM_STORAGE_KEY_B64__"
 CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER = "__SWM_CONTAINER_REGISTRY_PASSWORD_B64__"  # nosec B105
 
 
+def image_registry_host(image: str) -> str | None:
+    """Return registry host from an OCI/Docker image reference, or None for Docker Hub."""
+    name = (image or "").strip()
+    if not name:
+        return None
+    # Strip digest; tags stay on the last path segment (e.g. ubuntu:24.04).
+    path = name.split("@", 1)[0]
+    if "/" not in path:
+        # Short name or name:tag on Docker Hub (no registry host).
+        return None
+    first = path.split("/", 1)[0]
+    if not first:
+        return None
+    # First component is a registry host if it looks like a hostname/port.
+    if "." in first or first.lower() == "localhost" or re.fullmatch(r".+:\d+", first):
+        return first.lower()
+    return None
+
+
+def assert_registry_credentials_safe(
+    image: str,
+    server: str,
+    user: str,
+    password: str,
+) -> None:
+    """Reject shared registry credentials for images outside the configured server."""
+    has_creds = bool((user or "").strip() or (password or "").strip())
+    if not has_creds:
+        return
+    configured = (server or "").strip().lower()
+    if not configured:
+        raise ValueError("providers.azure.container_registry.server is required when registry credentials are set")
+    host = image_registry_host(image)
+    if host is None or host != configured:
+        raise ValueError(
+            f"container image registry host must be '{configured}' when shared registry "
+            f"credentials are configured (got image={image!r})"
+        )
+
+
 class AzureConnector(BaseConnector):
     def __init__(self) -> None:
         self._compute_client = None
@@ -689,7 +729,14 @@ class AzureConnector(BaseConnector):
         ports: str,
         user_ssh_cert: str,
         install_checkpoint_tools: bool = False,
+        container_registry_server: str = "",
     ) -> tuple[DeploymentExtended, str]:
+        assert_registry_credentials_safe(
+            container_image,
+            container_registry_server,
+            container_registry_username,
+            container_registry_password,
+        )
         resource_group_name = self._get_resource_group_name(partition_name)
         vm_count = self._parse_vm_count(count)
         LOG.info(f"Creating deployment with {vm_count} VM(s)")
@@ -709,7 +756,7 @@ class AzureConnector(BaseConnector):
         LOG.info(f"Provisioned resource group with ID: {resource_group_creation_result.id}")
 
         runtime_params = self._get_runtime_params(runtime)
-        container_registry = container_image.split("/")[0]
+        container_registry = image_registry_host(container_image) or ""
         cloud_init_script: str = self._get_cloud_init_script(
             job_id,
             container_image,

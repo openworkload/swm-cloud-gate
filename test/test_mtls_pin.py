@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import datetime
 import os
 import ssl
+import datetime
 import tempfile
 import unittest
 from pathlib import Path
 
+from fastapi import FastAPI
 from cryptography import x509
+from fastapi.testclient import TestClient
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 from swmcloudgate.mtls_middleware import ClientCertPinMiddleware, peer_cert_der_from_scope
 

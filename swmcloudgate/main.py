@@ -1,13 +1,13 @@
-import logging
 import os
+import logging
 
 from fastapi import FastAPI
 
 from . import uvicorn_peercert
-from .mtls_middleware import ClientCertPinMiddleware
 from .routers.azure import sizes as azure_sizes
 from .routers.azure import images as azure_images
 from .routers.azure import partitions as azure_partitions
+from .mtls_middleware import ClientCertPinMiddleware
 from .routers.openstack import sizes as openstack_sizes
 from .routers.openstack import images as openstack_images
 from .routers.openstack import partitions as openstack_partitions

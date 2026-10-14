@@ -14,8 +14,13 @@ Mandatory API credentials parameters (providers -> azure -> api_credentials):
 Optional parameters:
 
 a) if jobs pull container images from a registry that requires credentials (providers -> azure -> container_registry):
+* server: registry host (for example `swmregistry.azurecr.io`); required when user/password are set,
 * user: container registry user name,
 * password: container registry password or token;
+
+Job `#SWM container-image` values must use that `server` host when credentials
+are configured. Other registries are rejected so the shared password is not
+sent to a job-named host.
 
 b) if jobs require Azure storage mounting into their container (providers -> azure -> storage):
 * account: name of Azure storage account,

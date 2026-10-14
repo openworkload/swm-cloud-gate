@@ -7,8 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from swmcloudgate.azure_cert import AzureCertificateError, load_azure_certificate_data
 from swmcloudgate.config import get_settings
+from swmcloudgate.azure_cert import AzureCertificateError, load_azure_certificate_data
 
 
 class TestAzureCertificateLoad(unittest.TestCase):

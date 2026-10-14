@@ -4,9 +4,11 @@ import unittest
 from unittest.mock import Mock
 
 from swmcloudgate.routers.azure.connector import (
-    CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER,
     MAX_VM_COUNT,
+    CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER,
     AzureConnector,
+    image_registry_host,
+    assert_registry_credentials_safe,
 )
 
 
@@ -268,6 +270,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
             location="eastus",
             ports="10001,10022",
             user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+            container_registry_server="registry.example.org",
         )
 
         self.assertEqual(result, deployment_result)
@@ -328,6 +331,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
                 location="eastus",
                 ports="10001,10022",
                 user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+                container_registry_server="registry.example.org",
             )
 
         self.connector._resource_client.resource_groups.begin_delete.assert_called_once_with("part1-resource-group")
@@ -357,3 +361,73 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         parameters = props["properties"]["parameters"]
         self.assertEqual(parameters["containerRegistryPassword"]["value"], acr_password)
         self.assertNotIn(acr_password, parameters["cloudInitScript"]["value"])
+
+
+class TestRegistryHostAllowlist(unittest.TestCase):
+    def test_image_registry_host_parses_common_forms(self):
+        self.assertEqual(image_registry_host("swmregistry.azurecr.io/ns/img:tag"), "swmregistry.azurecr.io")
+        self.assertEqual(image_registry_host("Registry.Example.ORG/image:tag"), "registry.example.org")
+        self.assertEqual(image_registry_host("localhost:5000/foo:bar"), "localhost:5000")
+        self.assertIsNone(image_registry_host("ubuntu:24.04"))
+        self.assertIsNone(image_registry_host("library/ubuntu:24.04"))
+        self.assertIsNone(image_registry_host(""))
+
+    def test_assert_registry_credentials_safe_allows_matching_host(self):
+        assert_registry_credentials_safe(
+            "registry.example.org/image:tag",
+            "registry.example.org",
+            "user",
+            "secret",
+        )
+
+    def test_assert_registry_credentials_safe_rejects_foreign_host(self):
+        with self.assertRaises(ValueError) as ctx:
+            assert_registry_credentials_safe(
+                "evil.example/image:tag",
+                "registry.example.org",
+                "user",
+                "secret",
+            )
+        self.assertIn("registry.example.org", str(ctx.exception))
+        self.assertNotIn("secret", str(ctx.exception))
+
+    def test_assert_registry_credentials_safe_requires_server_when_creds_set(self):
+        with self.assertRaises(ValueError) as ctx:
+            assert_registry_credentials_safe(
+                "registry.example.org/image:tag",
+                "",
+                "user",
+                "secret",
+            )
+        self.assertIn("server is required", str(ctx.exception))
+
+    def test_assert_registry_credentials_safe_allows_any_image_without_creds(self):
+        assert_registry_credentials_safe("evil.example/image:tag", "", "", "")
+        assert_registry_credentials_safe("ubuntu:24.04", "registry.example.org", "", "")
+
+    def test_create_deployment_rejects_foreign_registry_when_creds_set(self):
+        connector = AzureConnector()
+        connector._test_responses = {}
+        connector._subscription_id = "test-subscription"
+        connector._resource_client = Mock()
+        with self.assertRaises(ValueError):
+            connector.create_deployment(
+                job_id="job-1",
+                partition_name="part1",
+                os_version="ubuntu-hpc/2404",
+                container_image="evil.example/image:tag",
+                container_registry_username="user",
+                container_registry_password="secret",
+                storage_account="storageaccount",
+                storage_key="storagekey",
+                storage_container="storagecontainer",
+                flavor_name="Standard_B2s",
+                username="azureuser",
+                count="1",
+                runtime="swm_source=ssh",
+                location="eastus",
+                ports="10001",
+                user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+                container_registry_server="registry.example.org",
+            )
+        connector._resource_client.resource_groups.create_or_update.assert_not_called()

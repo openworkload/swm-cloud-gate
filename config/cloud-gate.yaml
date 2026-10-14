@@ -12,6 +12,7 @@ providers:
       app_id: ""
       certificate_path: ""
     container_registry:
+      server: ""
       user: ""
       password: ""
     storage:

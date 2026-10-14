@@ -12,6 +12,7 @@ providers:
       app_id: "00000000-0000-0000-0000-000000000002"
       certificate_path: ""
     container_registry:
+      server: "swmregistry.azurecr.io"
       user: "test-user"
       password: "test-password"
     storage:

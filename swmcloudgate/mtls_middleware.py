@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import logging
 import os
-from typing import Any, Awaitable, Callable
+import logging
+from typing import Any, Callable, Awaitable
 
 from starlette.responses import JSONResponse
 
-from .tls import client_cert_allowed, spool_secure_dir
+from .tls import spool_secure_dir, client_cert_allowed
 
 LOGGER = logging.getLogger("swm")
 

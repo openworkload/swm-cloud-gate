@@ -23,6 +23,9 @@ class AzureApiCredentials(BaseModel):
 
 
 class AzureContainerRegistry(BaseModel):
+    # Registry host for podman login (e.g. swmregistry.azurecr.io). Required when
+    # user/password are set; job images must use this host.
+    server: str = ""
     user: str = ""
     password: str = ""
 

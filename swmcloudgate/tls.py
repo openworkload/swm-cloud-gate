@@ -6,10 +6,10 @@ cluster CA. Sky Port presents ``secure/node/{cert,key}.pem`` as the client.
 
 from __future__ import annotations
 
-import hashlib
-import logging
 import os
 import ssl
+import hashlib
+import logging
 import tempfile
 from typing import Any
 
