@@ -133,6 +133,23 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             "securestring",
         )
 
+    def test_cloud_init_yaml_uses_root_only_bootstrap_path(self):
+        with open("swmcloudgate/routers/azure/templates/cloud-init.yaml") as yaml_file:
+            cloud_init_yaml = yaml_file.read()
+        self.assertIn("path: /var/lib/swm/bootstrap/swm-init.sh", cloud_init_yaml)
+        self.assertIn("permissions: '0700'", cloud_init_yaml)
+        self.assertIn("bash -ex /var/lib/swm/bootstrap/swm-init.sh", cloud_init_yaml)
+        self.assertNotIn("/tmp/swm-init.sh", cloud_init_yaml)
+        self.assertNotIn("permissions: '0755'", cloud_init_yaml)
+
+    def test_cloud_init_script_removes_bootstrap_file_on_exit(self):
+        cloud_init_script = self._render_cloud_init_script()
+        self.assertIn('SWM_INIT_SCRIPT="/var/lib/swm/bootstrap/swm-init.sh"', cloud_init_script)
+        self.assertIn("trap cleanup_swm_init_script EXIT", cloud_init_script)
+        self.assertIn("shred -u", cloud_init_script)
+        self.assertIn('rm -f "$SWM_INIT_SCRIPT"', cloud_init_script)
+        self.assertNotIn("/tmp/swm-init.sh", cloud_init_script)
+
     def test_compute_vm_custom_data_uses_explicit_main_private_ip_reference(self):
         template = self._load_template()
 

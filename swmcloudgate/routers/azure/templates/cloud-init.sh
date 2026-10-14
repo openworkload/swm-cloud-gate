@@ -1,6 +1,22 @@
 #!/bin/bash
-# Invoked as `bash /tmp/swm-init.sh` from cloud-init (shebang flags are ignored).
+# Invoked as `bash /var/lib/swm/bootstrap/swm-init.sh` from cloud-init
+# (shebang flags are ignored). Mode 0700; removed on EXIT so secrets do not linger.
 set -ex
+
+SWM_INIT_SCRIPT="/var/lib/swm/bootstrap/swm-init.sh"
+
+cleanup_swm_init_script() {
+    if [[ ! -e "$SWM_INIT_SCRIPT" ]]; then
+        return 0
+    fi
+    if command -v shred >/dev/null 2>&1; then
+        shred -u "$SWM_INIT_SCRIPT" 2>/dev/null || rm -f "$SWM_INIT_SCRIPT"
+    else
+        rm -f "$SWM_INIT_SCRIPT"
+    fi
+}
+
+trap cleanup_swm_init_script EXIT
 
 HOST_NAME="{{ host_name }}"
 SWM_ROOT="/opt/swm"

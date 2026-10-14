@@ -16,10 +16,10 @@ package_update: false
 package_upgrade: false
 
 write_files:
-  - path: /tmp/swm-init.sh
-    permissions: '0755'
+  - path: /var/lib/swm/bootstrap/swm-init.sh
+    permissions: '0700'
     content: |+
 {{cloud_init_script}}
 
 runcmd:
-  - bash -ex /tmp/swm-init.sh
+  - bash -ex /var/lib/swm/bootstrap/swm-init.sh

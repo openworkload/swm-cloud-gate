@@ -45,6 +45,10 @@ Partition ARM deployments pass the container registry password and storage
 account key as `securestring` parameters. Cloud-init scripts hold placeholders
 only; ARM `replace` injects `base64(parameters(...))` into VM `customData`.
 
+On the VM, cloud-init writes the bootstrap script to
+`/var/lib/swm/bootstrap/swm-init.sh` with mode `0700`. The script removes
+itself on `EXIT` so registry and storage secrets do not remain on filesystem.
+
 ## OpenStack credentials and TLS
 
 Set `providers.openstack` in `~/.swm/cloud-gate.yaml`:
