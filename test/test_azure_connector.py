@@ -9,6 +9,8 @@ from swmcloudgate.routers.azure.connector import (
     AzureConnector,
     image_registry_host,
     assert_registry_credentials_safe,
+    parse_and_validate_ports,
+    resolve_nsg_source_prefixes,
 )
 
 
@@ -271,6 +273,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
             ports="10001,10022",
             user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
             container_registry_server="registry.example.org",
+            allow_ssh_from_internet=True,
         )
 
         self.assertEqual(result, deployment_result)
@@ -332,6 +335,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
                 ports="10001,10022",
                 user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
                 container_registry_server="registry.example.org",
+                allow_ssh_from_internet=True,
             )
 
         self.connector._resource_client.resource_groups.begin_delete.assert_called_once_with("part1-resource-group")
@@ -353,6 +357,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
                 cloud_init_script=cloud_init,
                 ports="10001",
                 vm_count=1,
+                allow_ssh_from_internet=True,
             )
         log_text = "\n".join(captured.output)
         self.assertNotIn(acr_password, log_text)
@@ -429,5 +434,153 @@ class TestRegistryHostAllowlist(unittest.TestCase):
                 ports="10001",
                 user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
                 container_registry_server="registry.example.org",
+                allow_ssh_from_internet=True,
             )
+        connector._resource_client.resource_groups.create_or_update.assert_not_called()
+
+
+class TestNsgPortValidation(unittest.TestCase):
+    def test_parse_and_validate_ports_accepts_valid_list(self):
+        self.assertEqual(parse_and_validate_ports("10001, 10022"), [10001, 10022])
+
+    def test_parse_and_validate_ports_rejects_empty_and_none(self):
+        with self.assertRaises(ValueError):
+            parse_and_validate_ports(None)
+        with self.assertRaises(ValueError):
+            parse_and_validate_ports("")
+        with self.assertRaises(ValueError):
+            parse_and_validate_ports("10001,")
+
+    def test_parse_and_validate_ports_rejects_non_integer_and_range(self):
+        with self.assertRaises(ValueError):
+            parse_and_validate_ports("abc")
+        with self.assertRaises(ValueError):
+            parse_and_validate_ports("0")
+        with self.assertRaises(ValueError):
+            parse_and_validate_ports("65536")
+
+    def test_parse_and_validate_ports_enforces_max_and_allowlist(self):
+        with self.assertRaises(ValueError) as ctx:
+            parse_and_validate_ports("10001,10022,10023", max_ingress_ports=2)
+        self.assertIn("too many", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:
+            parse_and_validate_ports("9999", allowed_ports=[10001, 10022])
+        self.assertIn("allowed_ports", str(ctx.exception))
+        self.assertEqual(
+            parse_and_validate_ports("10001", allowed_ports=[10001, 10022]),
+            [10001],
+        )
+
+    def test_resolve_nsg_source_prefixes_internet_opt_in(self):
+        ssh, job = resolve_nsg_source_prefixes([], True)
+        self.assertEqual(ssh, ["*"])
+        self.assertEqual(job, ["*"])
+
+    def test_resolve_nsg_source_prefixes_uses_configured_cidrs(self):
+        ssh, job = resolve_nsg_source_prefixes(["203.0.113.0/24", "198.51.100.10/32"], False)
+        self.assertEqual(ssh, ["203.0.113.0/24", "198.51.100.10/32"])
+        self.assertEqual(job, ["203.0.113.0/24", "198.51.100.10/32"])
+
+    def test_resolve_nsg_source_prefixes_requires_source_when_ssh_locked(self):
+        with self.assertRaises(ValueError) as ctx:
+            resolve_nsg_source_prefixes([], False)
+        self.assertIn("nsg_source_address_prefixes", str(ctx.exception))
+
+    def test_deployment_properties_applies_nsg_sources(self):
+        connector = AzureConnector()
+        os.environ["SWM_TEST_CONFIG"] = "test/data/responses.json"
+        try:
+            cloud_init = connector._get_cloud_init_script(
+                job_id="job-nsg",
+                container_image="registry.example.org/image:tag",
+                container_registry="registry.example.org",
+                container_registry_username="user",
+                storage_account="storageaccount",
+                storage_container="storagecontainer",
+                runtime_params={"swm_source": "ssh"},
+                user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+            )
+            props = connector._get_deployment_properties(
+                job_id="job-nsg",
+                partition_name="part-nsg",
+                flavor_name="Standard_B2s",
+                os_version="ubuntu-hpc/2404",
+                username="azureuser",
+                user_pub_key="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+                storage_key="storagekey",
+                container_registry_password="pass",
+                cloud_init_script=cloud_init,
+                ports="10001,10022",
+                vm_count=1,
+                nsg_source_address_prefixes=["203.0.113.0/24"],
+                allow_ssh_from_internet=False,
+            )
+        finally:
+            os.environ.pop("SWM_TEST_CONFIG", None)
+
+        nsg = next(
+            r
+            for r in props["properties"]["template"]["resources"]
+            if r["type"] == "Microsoft.Network/networkSecurityGroups"
+        )
+        rules = {rule["name"]: rule["properties"] for rule in nsg["properties"]["securityRules"]}
+        self.assertEqual(rules["SSH"]["sourceAddressPrefix"], "203.0.113.0/24")
+        self.assertNotEqual(rules["SSH"].get("sourceAddressPrefix"), "*")
+        self.assertEqual(rules["swm-port-10001"]["sourceAddressPrefix"], "203.0.113.0/24")
+        self.assertEqual(rules["swm-port-10022"]["destinationPortRange"], "10022")
+
+    def test_create_deployment_rejects_bad_ports_before_arm(self):
+        connector = AzureConnector()
+        connector._test_responses = {}
+        connector._subscription_id = "test-subscription"
+        connector._resource_client = Mock()
+        with self.assertRaises(ValueError):
+            connector.create_deployment(
+                job_id="job-1",
+                partition_name="part1",
+                os_version="ubuntu-hpc/2404",
+                container_image="registry.example.org/image:tag",
+                container_registry_username="",
+                container_registry_password="",
+                storage_account="storageaccount",
+                storage_key="storagekey",
+                storage_container="storagecontainer",
+                flavor_name="Standard_B2s",
+                username="azureuser",
+                count="1",
+                runtime="swm_source=ssh",
+                location="eastus",
+                ports="99999",
+                user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+                allow_ssh_from_internet=True,
+            )
+        connector._resource_client.resource_groups.create_or_update.assert_not_called()
+
+    def test_create_deployment_rejects_ssh_from_internet_without_opt_in(self):
+        connector = AzureConnector()
+        connector._test_responses = {}
+        connector._subscription_id = "test-subscription"
+        connector._resource_client = Mock()
+        with self.assertRaises(ValueError) as ctx:
+            connector.create_deployment(
+                job_id="job-1",
+                partition_name="part1",
+                os_version="ubuntu-hpc/2404",
+                container_image="registry.example.org/image:tag",
+                container_registry_username="",
+                container_registry_password="",
+                storage_account="storageaccount",
+                storage_key="storagekey",
+                storage_container="storagecontainer",
+                flavor_name="Standard_B2s",
+                username="azureuser",
+                count="1",
+                runtime="swm_source=ssh",
+                location="eastus",
+                ports="10001",
+                user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+                allow_ssh_from_internet=False,
+                nsg_source_address_prefixes=[],
+            )
+        self.assertIn("nsg_source_address_prefixes", str(ctx.exception))
         connector._resource_client.resource_groups.create_or_update.assert_not_called()

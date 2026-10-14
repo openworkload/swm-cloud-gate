@@ -25,6 +25,10 @@ providers:
       skus: "2404"
     user_ssh_cert: ""
     location: "eastus2"
+    allowed_ports: []
+    max_ingress_ports: 16
+    nsg_source_address_prefixes: []
+    allow_ssh_from_internet: false
   openstack:
     auth_url: "https://keystone.example:5000"
     username: ""

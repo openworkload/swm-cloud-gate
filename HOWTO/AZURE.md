@@ -32,6 +32,17 @@ c) VM image parameters (providers -> azure -> vm_image):
 * offer: name of the VM offer from that publisher,
 * skus: name of SKU,
 
+d) Network security group (NSG) ingress (providers -> azure):
+* nsg_source_address_prefixes: CIDR list for Sky Port egress (and any other
+  allowed sources). Use these in production so SSH and job ports are not open
+  to the whole Internet.
+* allow_ssh_from_internet: default `false`. Set `true` only in lab setups so
+  SSH (TCP 22) may use source `*`. When `false`, `nsg_source_address_prefixes`
+  must be non-empty.
+* allowed_ports: optional allowlist of TCP ports from the `ports` header.
+  Empty means any port in 1..65535 is accepted (still capped by max).
+* max_ingress_ports: maximum number of ports in the header (default 16).
+
 # Prepare your Azure account
 
 ## Create a service principal

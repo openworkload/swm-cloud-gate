@@ -77,6 +77,67 @@ def assert_registry_credentials_safe(
         )
 
 
+def parse_and_validate_ports(
+    ports: str | None,
+    allowed_ports: list[int] | None = None,
+    max_ingress_ports: int = 16,
+) -> list[int]:
+    """Parse the ports header into validated TCP port numbers."""
+    if ports is None or not str(ports).strip():
+        raise ValueError("ports header is required and must list at least one TCP port")
+    if max_ingress_ports < 1:
+        raise ValueError("max_ingress_ports must be at least 1")
+    allow = set(allowed_ports or [])
+    parsed: list[int] = []
+    for token in str(ports).split(","):
+        item = token.strip()
+        if not item:
+            raise ValueError("ports header contains an empty entry")
+        if not item.isdigit():
+            raise ValueError(f"invalid port value {item!r}: must be an integer")
+        port = int(item)
+        if port < 1 or port > 65535:
+            raise ValueError(f"invalid port {port}: must be in range 1..65535")
+        if allow and port not in allow:
+            raise ValueError(f"port {port} is not in providers.azure.allowed_ports")
+        parsed.append(port)
+    if len(parsed) > max_ingress_ports:
+        raise ValueError(f"too many ingress ports ({len(parsed)}): maximum is {max_ingress_ports}")
+    return parsed
+
+
+def resolve_nsg_source_prefixes(
+    nsg_source_address_prefixes: list[str] | None,
+    allow_ssh_from_internet: bool,
+) -> tuple[list[str], list[str]]:
+    """Return (ssh_sources, job_port_sources) for NSG rules.
+
+    SSH uses '*' only when allow_ssh_from_internet is true. Otherwise SSH uses
+    nsg_source_address_prefixes (required non-empty). Job-port rules use the
+    configured prefixes when set, otherwise '*'.
+    """
+    prefixes = [p.strip() for p in (nsg_source_address_prefixes or []) if p and str(p).strip()]
+    if allow_ssh_from_internet:
+        ssh_sources = ["*"]
+    elif prefixes:
+        ssh_sources = prefixes
+    else:
+        raise ValueError(
+            "providers.azure.nsg_source_address_prefixes must be set when allow_ssh_from_internet is false"
+        )
+    job_port_sources = prefixes if prefixes else ["*"]
+    return ssh_sources, job_port_sources
+
+
+def _set_rule_source_prefixes(properties: dict[str, typing.Any], prefixes: list[str]) -> None:
+    properties.pop("sourceAddressPrefix", None)
+    properties.pop("sourceAddressPrefixes", None)
+    if len(prefixes) == 1:
+        properties["sourceAddressPrefix"] = prefixes[0]
+    else:
+        properties["sourceAddressPrefixes"] = list(prefixes)
+
+
 class AzureConnector(BaseConnector):
     def __init__(self) -> None:
         self._compute_client = None
@@ -159,8 +220,17 @@ class AzureConnector(BaseConnector):
         cloud_init_script: str,
         ports: str,
         vm_count: int,
+        allowed_ports: list[int] | None = None,
+        max_ingress_ports: int = 16,
+        nsg_source_address_prefixes: list[str] | None = None,
+        allow_ssh_from_internet: bool = False,
     ) -> dict[str, dict[str, typing.Any]]:
         self._validate_admin_username(username)
+        validated_ports = parse_and_validate_ports(ports, allowed_ports, max_ingress_ports)
+        ssh_sources, job_port_sources = resolve_nsg_source_prefixes(
+            nsg_source_address_prefixes,
+            allow_ssh_from_internet,
+        )
         with open(TEMPLATE_FILE) as template_file:
             template = json.load(template_file)
         template_parameters = self._get_template_parameters(
@@ -184,7 +254,8 @@ class AzureConnector(BaseConnector):
                 "bytes": len(script_value) if isinstance(script_value, str) else "unknown"
             }
         LOG.debug(f"Template parameters for job {job_id}: {sanitized_parameters}")
-        self._append_security_rules(ports, template)
+        self._configure_ssh_nsg_rule(template, ssh_sources)
+        self._append_security_rules(validated_ports, template, job_port_sources)
         self._configure_main_vm_custom_data(template)
         self._add_compute_vms(partition_name, vm_count, template)
         return {
@@ -368,10 +439,25 @@ class AzureConnector(BaseConnector):
 
             LOG.debug(f"Added compute VM {compute_vm_name} to template")
 
-    def _append_security_rules(self, ports: str, template: dict[str, typing.Any]) -> None:
+    def _configure_ssh_nsg_rule(self, template: dict[str, typing.Any], ssh_sources: list[str]) -> None:
+        for resource in template["resources"]:
+            if resource["type"] != "Microsoft.Network/networkSecurityGroups":
+                continue
+            for rule in resource["properties"]["securityRules"]:
+                if rule.get("name") == "SSH":
+                    _set_rule_source_prefixes(rule["properties"], ssh_sources)
+                    LOG.debug(f"Configured SSH NSG sources: {ssh_sources}")
+                    return
+
+    def _append_security_rules(
+        self,
+        ports: list[int],
+        template: dict[str, typing.Any],
+        source_prefixes: list[str],
+    ) -> None:
         for resource in template["resources"]:
             if resource["type"] == "Microsoft.Network/networkSecurityGroups":
-                for counter, port in enumerate(ports.split(",")):
+                for counter, port in enumerate(ports):
                     rule = {
                         "name": f"swm-port-{port}",
                         "properties": {
@@ -379,12 +465,12 @@ class AzureConnector(BaseConnector):
                             "protocol": "Tcp",
                             "access": "Allow",
                             "direction": "Inbound",
-                            "sourceAddressPrefix": "*",
                             "sourcePortRange": "*",
                             "destinationAddressPrefix": "*",
-                            "destinationPortRange": port,
+                            "destinationPortRange": str(port),
                         },
                     }
+                    _set_rule_source_prefixes(rule["properties"], source_prefixes)
                     LOG.debug(f"Add security group rule: {rule}")
                     resource["properties"]["securityRules"].append(rule)
 
@@ -730,6 +816,10 @@ class AzureConnector(BaseConnector):
         user_ssh_cert: str,
         install_checkpoint_tools: bool = False,
         container_registry_server: str = "",
+        allowed_ports: list[int] | None = None,
+        max_ingress_ports: int = 16,
+        nsg_source_address_prefixes: list[str] | None = None,
+        allow_ssh_from_internet: bool = False,
     ) -> tuple[DeploymentExtended, str]:
         assert_registry_credentials_safe(
             container_image,
@@ -737,6 +827,9 @@ class AzureConnector(BaseConnector):
             container_registry_username,
             container_registry_password,
         )
+        # Validate NSG inputs before any ARM / resource-group work.
+        parse_and_validate_ports(ports, allowed_ports, max_ingress_ports)
+        resolve_nsg_source_prefixes(nsg_source_address_prefixes, allow_ssh_from_internet)
         resource_group_name = self._get_resource_group_name(partition_name)
         vm_count = self._parse_vm_count(count)
         LOG.info(f"Creating deployment with {vm_count} VM(s)")
@@ -782,6 +875,10 @@ class AzureConnector(BaseConnector):
             cloud_init_script,
             ports,
             vm_count,
+            allowed_ports=allowed_ports,
+            max_ingress_ports=max_ingress_ports,
+            nsg_source_address_prefixes=nsg_source_address_prefixes,
+            allow_ssh_from_internet=allow_ssh_from_internet,
         )
         try:
             deployment_async_operation = self._resource_client.deployments.begin_create_or_update(

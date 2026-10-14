@@ -49,6 +49,12 @@ class AzureProvider(BaseModel):
     vm_image: AzureVmImage = AzureVmImage()
     user_ssh_cert: str = ""
     location: str = "eastus2"
+    # NSG ingress: empty allowed_ports = any port in 1..65535 (still capped by max).
+    allowed_ports: list[int] = []
+    max_ingress_ports: int = 16
+    # Sky Port egress CIDR(s). Empty job-port rules use "*"; SSH needs this or opt-in.
+    nsg_source_address_prefixes: list[str] = []
+    allow_ssh_from_internet: bool = False
 
 
 class OpenStackProvider(BaseModel):

@@ -80,6 +80,10 @@ async def create_partition(
         storage_key = settings.providers.azure.storage.key
         storage_container = settings.providers.azure.storage.container
         user_ssh_cert = settings.providers.azure.user_ssh_cert
+        allowed_ports = settings.providers.azure.allowed_ports
+        max_ingress_ports = settings.providers.azure.max_ingress_ports
+        nsg_source_address_prefixes = settings.providers.azure.nsg_source_address_prefixes
+        allow_ssh_from_internet = settings.providers.azure.allow_ssh_from_internet
 
         CONNECTOR.reinitialize(subscription_id, tenant_id, app_id)
 
@@ -102,6 +106,10 @@ async def create_partition(
             user_ssh_cert,
             install_checkpoint_tools=install_checkpoint_tools,
             container_registry_server=container_registry_server,
+            allowed_ports=allowed_ports,
+            max_ingress_ports=max_ingress_ports,
+            nsg_source_address_prefixes=nsg_source_address_prefixes,
+            allow_ssh_from_internet=allow_ssh_from_internet,
         )
         if result:
             return {"partition": convert_to_partition(result, resource_group_name)}

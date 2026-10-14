@@ -54,6 +54,21 @@ image registry host matches `providers.azure.container_registry.server`.
 Foreign registry hosts are rejected at partition create (HTTP 400). Short-lived
 or per-registry pull tokens remain a follow-up.
 
+## Azure NSG ports and SSH
+
+Partition NSG rules do not open SSH from `*` by default. Set
+`providers.azure.nsg_source_address_prefixes` to Sky Port egress CIDR(s), or set
+`allow_ssh_from_internet: true` only for lab use.
+
+Job-port rules from the `ports` header use the same CIDR list when it is set;
+otherwise they use `*` (operators should set the list in production). The gate
+validates port values (integers 1..65535), enforces `max_ingress_ports`, and
+applies `allowed_ports` when that list is non-empty. Invalid ports return HTTP
+400.
+
+This NSG control is separate from swm-core `submission_address_allowlist`, which
+limits TCP proxy upstream targets on the Sky Port side.
+
 ## OpenStack credentials and TLS
 
 Set `providers.openstack` in `~/.swm/cloud-gate.yaml`:
