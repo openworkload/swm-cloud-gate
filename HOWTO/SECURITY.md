@@ -39,6 +39,12 @@ Azure `CertificateCredential` uses gate-local PEM material:
 
 Request bodies must not carry private keys.
 
+## Azure registry and storage secrets
+
+Partition ARM deployments pass the container registry password and storage
+account key as `securestring` parameters. Cloud-init scripts hold placeholders
+only; ARM `replace` injects `base64(parameters(...))` into VM `customData`.
+
 ## OpenStack credentials and TLS
 
 Set `providers.openstack` in `~/.swm/cloud-gate.yaml`:

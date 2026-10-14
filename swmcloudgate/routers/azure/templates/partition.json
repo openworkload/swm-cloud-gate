@@ -53,6 +53,12 @@
         "description": "Azure storage access key."
       }
     },
+    "containerRegistryPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "ACR / container registry password."
+      }
+    },
     "dnsLabelPrefix": {
       "type": "string",
       "defaultValue": "[toLower(parameters('vmNameMain'))]",

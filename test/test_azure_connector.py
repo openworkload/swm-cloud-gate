@@ -3,7 +3,11 @@ import json
 import unittest
 from unittest.mock import Mock
 
-from swmcloudgate.routers.azure.connector import MAX_VM_COUNT, AzureConnector
+from swmcloudgate.routers.azure.connector import (
+    CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER,
+    MAX_VM_COUNT,
+    AzureConnector,
+)
 
 
 class TestAzureConnectorMultiNode(unittest.TestCase):
@@ -24,7 +28,6 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
             "container_image": "registry.example.org/image:tag",
             "container_registry": "registry.example.org",
             "container_registry_username": "user",
-            "container_registry_password": "pass",
             "storage_account": "storageaccount",
             "storage_container": "storagecontainer",
             "runtime_params": {"swm_source": "ssh"},
@@ -36,7 +39,6 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
             container_image=params["container_image"],
             container_registry=params["container_registry"],
             container_registry_username=params["container_registry_username"],
-            container_registry_password=params["container_registry_password"],
             storage_account=params["storage_account"],
             storage_container=params["storage_container"],
             runtime_params=params["runtime_params"],
@@ -214,13 +216,17 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         self.assertNotIn("getent hosts", cloud_init_script)
         self.assertIn('echo "$(date): could not determine main instance details" >&2', cloud_init_script)
 
-    def test_cloud_init_script_quotes_shell_special_characters(self):
-        cloud_init_script = self._render_cloud_init_script(
-            container_registry_password="pa&ss<word>",
-        )
+    def test_cloud_init_script_uses_registry_password_placeholder(self):
+        cloud_init_script = self._render_cloud_init_script()
 
-        self.assertIn("pa&ss<word>", cloud_init_script)
-        self.assertIn("container_registry_password='pa&ss<word>'", cloud_init_script)
+        self.assertIn(
+            f'container_registry_password_b64="{CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER}"',
+            cloud_init_script,
+        )
+        self.assertIn(
+            "container_registry_password=$(printf '%s' \"$container_registry_password_b64\" | base64 -d)",
+            cloud_init_script,
+        )
         self.assertIn('if [ -n "$container_registry_password" ]; then', cloud_init_script)
         self.assertIn("--password-stdin", cloud_init_script)
         self.assertIn(
@@ -229,7 +235,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         )
         self.assertNotIn('--password "$container_registry_password"', cloud_init_script)
         self.assertIn('podman pull "$container_image"', cloud_init_script)
-        self.assertNotIn("pa&amp;ss&lt;word&gt;", cloud_init_script)
+        self.assertNotIn("pa&ss<word>", cloud_init_script)
 
     def test_create_deployment_builds_multi_node_template(self):
         self.connector._test_responses = {}
@@ -244,13 +250,14 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         deployment_operation.result.return_value = deployment_result
         self.connector._resource_client.deployments.begin_create_or_update.return_value = deployment_operation
 
+        acr_password = "acr-secret-TOKEN-xyz"
         result, resource_group_name = self.connector.create_deployment(
             job_id="job-1",
             partition_name="part1",
             os_version="ubuntu-hpc/2404",
             container_image="registry.example.org/image:tag",
             container_registry_username="user",
-            container_registry_password="pass",
+            container_registry_password=acr_password,
             storage_account="storageaccount",
             storage_key="storagekey",
             storage_container="storagecontainer",
@@ -273,7 +280,10 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         self.assertEqual(len(virtual_machines), 3)
         self.assertEqual(parameters["vmNameMain"]["value"], "part1-main")
         self.assertEqual(parameters["storageKey"]["value"], "storagekey")
+        self.assertEqual(parameters["containerRegistryPassword"]["value"], acr_password)
         self.assertNotIn("storagekey", parameters["cloudInitScript"]["value"])
+        self.assertNotIn(acr_password, parameters["cloudInitScript"]["value"])
+        self.assertIn(CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER, parameters["cloudInitScript"]["value"])
         self.assertEqual(
             template["variables"]["linuxConfiguration"]["ssh"]["publicKeys"][0]["path"],
             "[concat('/home/', parameters('adminUsername'), '/.ssh/authorized_keys')]",
@@ -281,6 +291,10 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
 
         main_vm = next(resource for resource in virtual_machines if resource["name"] == "[parameters('vmNameMain')]")
         self.assertIn("base64(parameters('storageKey'))", main_vm["properties"]["osProfile"]["customData"])
+        self.assertIn(
+            "base64(parameters('containerRegistryPassword'))",
+            main_vm["properties"]["osProfile"]["customData"],
+        )
 
     def test_create_deployment_rolls_back_resource_group_on_failure(self):
         self.connector._test_responses = {}
@@ -318,3 +332,28 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
 
         self.connector._resource_client.resource_groups.begin_delete.assert_called_once_with("part1-resource-group")
         delete_operation.result.assert_called_once()
+
+    def test_deployment_properties_debug_log_redacts_secrets(self):
+        acr_password = "acr-secret-TOKEN-for-log-test"
+        cloud_init = self._render_cloud_init_script()
+        with self.assertLogs("swm", level="DEBUG") as captured:
+            props = self.connector._get_deployment_properties(
+                job_id="job-log",
+                partition_name="part-log",
+                flavor_name="Standard_B2s",
+                os_version="ubuntu-hpc/2404",
+                username="azureuser",
+                user_pub_key="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
+                storage_key="storagekey-secret",
+                container_registry_password=acr_password,
+                cloud_init_script=cloud_init,
+                ports="10001",
+                vm_count=1,
+            )
+        log_text = "\n".join(captured.output)
+        self.assertNotIn(acr_password, log_text)
+        self.assertNotIn("storagekey-secret", log_text)
+        self.assertNotIn(cloud_init[:80], log_text)
+        parameters = props["properties"]["parameters"]
+        self.assertEqual(parameters["containerRegistryPassword"]["value"], acr_password)
+        self.assertNotIn(acr_password, parameters["cloudInitScript"]["value"])

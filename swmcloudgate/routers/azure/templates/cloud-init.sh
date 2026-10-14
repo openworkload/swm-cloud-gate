@@ -582,10 +582,14 @@ pull_container_image() {
     local container_registry={{ container_registry | shellquote }}
     local container_registry_username={{ container_registry_username | shellquote }}
     local container_image={{ container_image | shellquote }}
+    local container_registry_password_b64
     local container_registry_password
 
+    # Avoid leaking the registry password via `set -x` / cloud-init-output.log.
+    # Password is injected by ARM replace of the b64 placeholder (securestring).
     set +x
-    container_registry_password={{ container_registry_password | shellquote }}
+    container_registry_password_b64="{{ container_registry_password_b64 }}"
+    container_registry_password=$(printf '%s' "$container_registry_password_b64" | base64 -d)
     if [ -n "$container_registry_password" ]; then
         printf '%s\n' "$(date): login to the registry: $container_registry"
         printf '%s' "$container_registry_password" \
@@ -593,7 +597,7 @@ pull_container_image() {
                 --username "$container_registry_username" \
                 --password-stdin
     fi
-    unset container_registry_password
+    unset container_registry_password container_registry_password_b64
     set -x
 
     echo "$(date): pull job container image: $container_image"

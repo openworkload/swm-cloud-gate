@@ -1,12 +1,12 @@
 import os
 import json
-import shlex
 import unittest
 
 from swmcloudgate.routers.azure.connector import (
     IS_MAIN_PLACEHOLDER,
     HOST_NAME_PLACEHOLDER,
     STORAGE_KEY_B64_PLACEHOLDER,
+    CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER,
     MAIN_INSTANCE_HOSTNAME_PLACEHOLDER,
     MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER,
     AzureConnector,
@@ -33,7 +33,6 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             container_image="registry.example.org/image:tag",
             container_registry="registry.example.org",
             container_registry_username="user",
-            container_registry_password="user<&>\"'pass",
             storage_account="storageaccount",
             storage_container="storagecontainer",
             runtime_params={"swm_source": "ssh"},
@@ -43,7 +42,6 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
 
     def test_cloud_init_script_uses_explicit_main_instance_placeholders(self):
         cloud_init_script = self._render_cloud_init_script()
-        expected_password = shlex.quote("user<&>\"'pass")
 
         self.assertIn(f'HOST_NAME="{HOST_NAME_PLACEHOLDER}"', cloud_init_script)
         self.assertIn(f"IS_MAIN={IS_MAIN_PLACEHOLDER}", cloud_init_script)
@@ -58,9 +56,14 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
         self.assertIn(f'azure_storage_key_b64="{STORAGE_KEY_B64_PLACEHOLDER}"', cloud_init_script)
         self.assertIn("azure_storage_key=$(printf '%s' \"$azure_storage_key_b64\" | base64 -d)", cloud_init_script)
         self.assertIn(
-            f"container_registry_password={expected_password}",
+            f'container_registry_password_b64="{CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER}"',
             cloud_init_script,
         )
+        self.assertIn(
+            "container_registry_password=$(printf '%s' \"$container_registry_password_b64\" | base64 -d)",
+            cloud_init_script,
+        )
+        self.assertNotIn("user<&>\"'pass", cloud_init_script)
         self.assertIn("--password-stdin", cloud_init_script)
         self.assertIn(
             'podman login "$container_registry"',
@@ -120,6 +123,15 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             custom_data,
         )
         self.assertIn("base64(parameters('storageKey'))", custom_data)
+        self.assertIn("base64(parameters('containerRegistryPassword'))", custom_data)
+        self.assertIn(f"'{CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER}'", custom_data)
+
+    def test_partition_json_marks_registry_password_securestring(self):
+        template = self._load_template()
+        self.assertEqual(
+            template["parameters"]["containerRegistryPassword"]["type"],
+            "securestring",
+        )
 
     def test_compute_vm_custom_data_uses_explicit_main_private_ip_reference(self):
         template = self._load_template()
@@ -146,6 +158,7 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
             custom_data,
         )
         self.assertIn("base64(parameters('storageKey'))", custom_data)
+        self.assertIn("base64(parameters('containerRegistryPassword'))", custom_data)
         self.assertIn(
             "[resourceId('Microsoft.Network/networkInterfaces', variables('networkInterfaceName'))]",
             compute_vm["dependsOn"],

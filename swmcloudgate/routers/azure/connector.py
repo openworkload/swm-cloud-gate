@@ -34,6 +34,7 @@ IS_MAIN_PLACEHOLDER = "__SWM_IS_MAIN__"
 MAIN_INSTANCE_HOSTNAME_PLACEHOLDER = "__SWM_MAIN_INSTANCE_HOSTNAME__"
 MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER = "__SWM_MAIN_INSTANCE_PRIVATE_IP__"
 STORAGE_KEY_B64_PLACEHOLDER = "__SWM_STORAGE_KEY_B64__"
+CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER = "__SWM_CONTAINER_REGISTRY_PASSWORD_B64__"  # nosec B105
 
 
 class AzureConnector(BaseConnector):
@@ -114,6 +115,7 @@ class AzureConnector(BaseConnector):
         username: str,
         user_pub_key: str,
         storage_key: str,
+        container_registry_password: str,
         cloud_init_script: str,
         ports: str,
         vm_count: int,
@@ -129,12 +131,18 @@ class AzureConnector(BaseConnector):
             username,
             user_pub_key,
             storage_key,
+            container_registry_password,
             cloud_init_script,
         )
         sanitized_parameters = copy.deepcopy(template_parameters)
-        for secret_key in ("adminPasswordOrKey", "storageKey"):
+        for secret_key in ("adminPasswordOrKey", "storageKey", "containerRegistryPassword"):
             if secret_key in sanitized_parameters:
                 sanitized_parameters[secret_key]["value"] = "***"
+        if "cloudInitScript" in sanitized_parameters:
+            script_value = sanitized_parameters["cloudInitScript"].get("value", "")
+            sanitized_parameters["cloudInitScript"]["value"] = {
+                "bytes": len(script_value) if isinstance(script_value, str) else "unknown"
+            }
         LOG.debug(f"Template parameters for job {job_id}: {sanitized_parameters}")
         self._append_security_rules(ports, template)
         self._configure_main_vm_custom_data(template)
@@ -181,6 +189,10 @@ class AzureConnector(BaseConnector):
             (MAIN_INSTANCE_HOSTNAME_PLACEHOLDER, "parameters('vmNameMain')"),
             (MAIN_INSTANCE_PRIVATE_IP_PLACEHOLDER, self._get_main_vm_private_ip_expression()),
             (STORAGE_KEY_B64_PLACEHOLDER, "base64(parameters('storageKey'))"),
+            (
+                CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER,
+                "base64(parameters('containerRegistryPassword'))",
+            ),
         )
         for placeholder, replacement in replacements:
             custom_data_expression = f"replace({custom_data_expression}, '{placeholder}', {replacement})"
@@ -350,6 +362,7 @@ class AzureConnector(BaseConnector):
         username: str,
         user_pub_key: str,
         storage_key: str,
+        container_registry_password: str,
         cloud_init_script: str,
     ) -> dict[str, str]:
         template_loader = jinja2.FileSystemLoader(searchpath="./")
@@ -364,6 +377,7 @@ class AzureConnector(BaseConnector):
             "adminUsername": {"value": username},
             "adminPasswordOrKey": {"value": user_pub_key},
             "storageKey": {"value": storage_key},
+            "containerRegistryPassword": {"value": container_registry_password},
             "osVersion": {"value": os_version},
             "vmSize": {"value": flavor_name},
             "cloudInitScript": {"value": cloud_init_yaml},
@@ -561,13 +575,13 @@ class AzureConnector(BaseConnector):
         container_image: str,
         container_registry: str,
         container_registry_username: str,
-        container_registry_password: str,
         storage_account: str,
         storage_container: str,
         runtime_params: dict[str, str],
         user_ssh_cert: str,
         install_checkpoint_tools: bool = False,
     ) -> str:
+        """Render cloud-init.sh. Registry password is an ARM securestring placeholder."""
         template_loader = jinja2.FileSystemLoader(searchpath="./")
         template_env = jinja2.Environment(  # nosec B701 - shellquote secures interpolated shell values here
             loader=template_loader, autoescape=False
@@ -581,7 +595,7 @@ class AzureConnector(BaseConnector):
             container_image=container_image,
             container_registry=container_registry,
             container_registry_username=container_registry_username,
-            container_registry_password=container_registry_password,
+            container_registry_password_b64=CONTAINER_REGISTRY_PASSWORD_B64_PLACEHOLDER,
             storage_account=storage_account,
             storage_key_b64=STORAGE_KEY_B64_PLACEHOLDER,
             storage_container=storage_container,
@@ -701,7 +715,6 @@ class AzureConnector(BaseConnector):
             container_image,
             container_registry,
             container_registry_username,
-            container_registry_password,
             storage_account,
             storage_container,
             runtime_params,
@@ -718,6 +731,7 @@ class AzureConnector(BaseConnector):
             username,
             user_ssh_cert,
             storage_key,
+            container_registry_password,
             cloud_init_script,
             ports,
             vm_count,
