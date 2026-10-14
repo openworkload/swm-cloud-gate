@@ -1,8 +1,9 @@
+import http
 import logging
 import traceback
 from typing import Optional, Annotated
 
-from fastapi import Header, APIRouter
+from fastapi import Header, APIRouter, HTTPException
 
 from swmcloudgate import config
 
@@ -55,6 +56,9 @@ async def list_flavors(
                 flavor_list.append(convert_to_flavor(item))
     except Exception as e:
         LOG.error(traceback.format_exception(e))
-        return {"error": traceback.format_exception(e)}
+        raise HTTPException(
+            status_code=http.HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail="Cannot list flavors",
+        ) from e
 
     return {"flavors": flavor_list}

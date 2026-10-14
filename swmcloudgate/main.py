@@ -1,7 +1,8 @@
 import os
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from . import uvicorn_peercert
 from .routers.azure import sizes as azure_sizes
@@ -20,8 +21,16 @@ LOGGER.setLevel(logging.DEBUG)
 if os.environ.get("SWM_GATE_DISABLE_PEER_CERT_PATCH", "").strip() not in ("1", "true", "yes"):
     uvicorn_peercert.install()
 
-app = FastAPI(debug=True)
+app = FastAPI(debug=False)
 app.add_middleware(ClientCertPinMiddleware)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Return a generic 500; keep stack traces in server logs only."""
+    LOGGER.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
 
 app.include_router(openstack_partitions.ROUTER)
 app.include_router(openstack_images.ROUTER)

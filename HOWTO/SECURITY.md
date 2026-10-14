@@ -29,6 +29,13 @@ not in the scope (for example TestClient), the pin is skipped; handshake
 Do **not** send node private keys in HTTP bodies. Sky Port authenticates with
 mTLS only.
 
+## Error responses
+
+The gate runs with FastAPI `debug=False`. Unexpected errors return HTTP 500 with
+a generic `detail` body. Stack traces stay in server logs only and are not sent
+to clients. Intentional validation failures (for example bad ports) still return
+HTTP 400 with a short message and no traceback.
+
 ## Azure service principal certificate
 
 Azure `CertificateCredential` uses gate-local PEM material:

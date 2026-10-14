@@ -154,7 +154,10 @@ async def create_partition(
 
     except Exception as e:
         LOG.error(traceback.format_exception(e))
-        return {"error": traceback.format_exception(e)}
+        raise HTTPException(
+            status_code=http.HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail="Cannot create Azure deployment",
+        ) from e
 
     return {"error": "Cannot create Azure deployment"}
 
@@ -191,7 +194,10 @@ async def list_partitions():
 
     except Exception as e:
         LOG.error(traceback.format_exception(e))
-        return {"error": traceback.format_exception(e)}
+        raise HTTPException(
+            status_code=http.HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail="Cannot list partitions",
+        ) from e
 
 
 @ROUTER.get("/azure/partitions//subscriptions/{subscriptionid}/resourceGroups/{partitionname}-resource-group")
@@ -220,7 +226,10 @@ async def get_partition_by_id(
 
     except Exception as e:
         LOG.error(traceback.format_exception(e))
-        return {"error": traceback.format_exception(e)}
+        raise HTTPException(
+            status_code=http.HTTPStatus.INTERNAL_SERVER_ERROR,
+            detail="Cannot get partition",
+        ) from e
 
     raise HTTPException(
         status_code=http.client.NOT_FOUND,
