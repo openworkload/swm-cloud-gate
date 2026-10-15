@@ -1,6 +1,8 @@
 import os
 import http
+import json
 import uuid
+import shlex
 import typing
 import logging
 import datetime
@@ -14,6 +16,8 @@ from libcloud.compute.types import Provider
 from libcloud.common.openstack import OpenStackResponse
 from libcloud.compute.providers import get_driver
 from libcloud.compute.drivers.openstack import OpenStackNodeSize
+
+from swmcloudgate.validation import assert_job_id
 
 from .auth import OpenStackAuthError, load_openstack_provider
 from ..baseconnector import BaseConnector
@@ -136,30 +140,41 @@ class OpenStackConnector(BaseConnector):
         ports: str,
         container_image: str,
     ) -> str:
+        try:
+            compute_instances_count = int(count) if count is not None and str(count).strip() != "" else 1
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Invalid VM count {count!r}: must be an integer") from e
         template_loader = jinja2.FileSystemLoader(searchpath="./")
-        template_env = jinja2.Environment(loader=template_loader, autoescape=True)
+        template_env = jinja2.Environment(  # nosec B701 - yamls/shellquote secure interpolated values
+            loader=template_loader, autoescape=False
+        )
+        template_env.filters["yamls"] = json.dumps
         template = template_env.get_template(STACK_TEMLPATE_FILE)
         yaml_str = template.render(
             stack_name=stack_name,
             image_name=image_name,
             flavor_name=flavor_name,
             key_name=key_name,
-            compute_instances_count=count,
-            ingres_tcp_ports=ports.split(","),
+            compute_instances_count=compute_instances_count,
+            ingres_tcp_ports=[p.strip() for p in (ports or "").split(",") if p.strip()],
             init_script=self._get_cloud_init_script(job_id, runtime, container_image),
         )
         return yaml.safe_load(yaml_str)
 
     def _get_cloud_init_script(self, job_id: str, runtime: str, contianer_image: str) -> str:
+        job_id = assert_job_id(job_id)
         runtime_params = self._get_runtime_params(runtime)
         template_loader = jinja2.FileSystemLoader(searchpath="./")
-        template_env = jinja2.Environment(loader=template_loader, autoescape=True)
+        template_env = jinja2.Environment(  # nosec B701 - shellquote secures interpolated shell values
+            loader=template_loader, autoescape=False
+        )
+        template_env.filters["shellquote"] = shlex.quote
         template = template_env.get_template(CLOUD_INIT_SCRIPT_FILE)
         script: str = template.render(
             job_id=job_id,
-            swm_source=runtime_params.get("swm_source"),
-            ssh_pub_key=runtime_params.get("ssh_pub_key"),
-            container_image=contianer_image,
+            swm_source=runtime_params.get("swm_source") or "",
+            ssh_pub_key=runtime_params.get("ssh_pub_key") or "",
+            container_image=contianer_image or "",
         )
         return script
 
@@ -208,6 +223,7 @@ class OpenStackConnector(BaseConnector):
         ports: str,
         container_image: str,
     ) -> str:
+        job_id = assert_job_id(job_id)
         if self._test_responses:
             id = str(uuid.uuid4())
             time = datetime.datetime.now().isoformat()
@@ -233,6 +249,8 @@ class OpenStackConnector(BaseConnector):
                 ports,
                 container_image,
             )
+        except ValueError:
+            raise
         except Exception as e:
             LOG.error(f"Cannot read stack template: {e}, {traceback.format_exc()}")
             return {}

@@ -29,7 +29,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
 
     def _render_cloud_init_script(self, **overrides):
         params = {
-            "job_id": "job-1",
+            "job_id": "40565124-9c03-11ee-8ca4-a3132f7ae2fb",
             "container_image": "registry.example.org/image:tag",
             "container_registry": "registry.example.org",
             "container_registry_username": "user",
@@ -257,7 +257,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
 
         acr_password = "acr-secret-TOKEN-xyz"
         result, resource_group_name = self.connector.create_deployment(
-            job_id="job-1",
+            job_id="40565124-9c03-11ee-8ca4-a3132f7ae2fb",
             partition_name="part1",
             os_version="ubuntu-hpc/2404",
             container_image="registry.example.org/image:tag",
@@ -319,7 +319,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
 
         with self.assertRaises(RuntimeError):
             self.connector.create_deployment(
-                job_id="job-1",
+                job_id="40565124-9c03-11ee-8ca4-a3132f7ae2fb",
                 partition_name="part1",
                 os_version="ubuntu-hpc/2404",
                 container_image="registry.example.org/image:tag",
@@ -347,7 +347,7 @@ class TestAzureConnectorMultiNode(unittest.TestCase):
         cloud_init = self._render_cloud_init_script()
         with self.assertLogs("swm", level="DEBUG") as captured:
             props = self.connector._get_deployment_properties(
-                job_id="job-log",
+                job_id="40565124-9c03-11ee-8ca4-a3132f7ae2fb",
                 partition_name="part-log",
                 flavor_name="Standard_B2s",
                 os_version="ubuntu-hpc/2404",
@@ -418,7 +418,7 @@ class TestRegistryHostAllowlist(unittest.TestCase):
         connector._resource_client = Mock()
         with self.assertRaises(ValueError):
             connector.create_deployment(
-                job_id="job-1",
+                job_id="40565124-9c03-11ee-8ca4-a3132f7ae2fb",
                 partition_name="part1",
                 os_version="ubuntu-hpc/2404",
                 container_image="evil.example/image:tag",
@@ -492,7 +492,7 @@ class TestNsgPortValidation(unittest.TestCase):
         os.environ["SWM_TEST_CONFIG"] = "test/data/responses.json"
         try:
             cloud_init = connector._get_cloud_init_script(
-                job_id="job-nsg",
+                job_id="40565124-9c03-11ee-8ca4-a3132f7ae2fb",
                 container_image="registry.example.org/image:tag",
                 container_registry="registry.example.org",
                 container_registry_username="user",
@@ -502,7 +502,7 @@ class TestNsgPortValidation(unittest.TestCase):
                 user_ssh_cert="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC",
             )
             props = connector._get_deployment_properties(
-                job_id="job-nsg",
+                job_id="40565124-9c03-11ee-8ca4-a3132f7ae2fb",
                 partition_name="part-nsg",
                 flavor_name="Standard_B2s",
                 os_version="ubuntu-hpc/2404",
@@ -537,7 +537,7 @@ class TestNsgPortValidation(unittest.TestCase):
         connector._resource_client = Mock()
         with self.assertRaises(ValueError):
             connector.create_deployment(
-                job_id="job-1",
+                job_id="40565124-9c03-11ee-8ca4-a3132f7ae2fb",
                 partition_name="part1",
                 os_version="ubuntu-hpc/2404",
                 container_image="registry.example.org/image:tag",
@@ -564,7 +564,7 @@ class TestNsgPortValidation(unittest.TestCase):
         connector._resource_client = Mock()
         with self.assertRaises(ValueError) as ctx:
             connector.create_deployment(
-                job_id="job-1",
+                job_id="40565124-9c03-11ee-8ca4-a3132f7ae2fb",
                 partition_name="part1",
                 os_version="ubuntu-hpc/2404",
                 container_image="registry.example.org/image:tag",

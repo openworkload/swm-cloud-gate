@@ -36,6 +36,16 @@ a generic `detail` body. Stack traces stay in server logs only and are not sent
 to clients. Intentional validation failures (for example bad ports) still return
 HTTP 400 with a short message and no traceback.
 
+## Job id and cloud-init shell safety
+
+Partition create requires `job_id` to be a UUID (`8-4-4-4-12` hex). Invalid
+values return HTTP 400 before templates render.
+
+Azure and OpenStack cloud-init scripts interpolate attacker-influenced values
+with `shlex.quote` (`shellquote` Jinja filter). OpenStack Heat templates use
+JSON/YAML-safe quoting for string fields and do not use HTML autoescape for
+shell or Heat user data.
+
 ## Azure service principal certificate
 
 Azure `CertificateCredential` uses gate-local PEM material:

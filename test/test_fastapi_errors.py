@@ -90,7 +90,7 @@ class TestAzurePartitionErrorBodies(unittest.TestCase):
             resp = self.client.post(
                 "/azure/partitions",
                 headers={
-                    "jobid": "job-1",
+                    "jobid": "40565124-9c03-11ee-8ca4-a3132f7ae2fb",
                     "partname": "part1",
                     "osversion": "ubuntu-hpc/2404",
                     "containerimage": "swmregistry.azurecr.io/img:tag",

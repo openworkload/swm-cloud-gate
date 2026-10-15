@@ -1,10 +1,10 @@
 #!/bin/bash -ex
 
 function download_swm_worker() {
-    echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source }}"
+    echo $(date) ": ensure swm worker is installed, SWM_SOURCE={{ swm_source | shellquote }}"
 
-    if [[ "{{ swm_source }}" == "ssh" ]]; then
-        echo "{{ ssh_pub_key }}" >> /root/.ssh/authorized_keys
+    if [[ {{ swm_source | shellquote }} == "ssh" ]]; then
+        echo {{ ssh_pub_key | shellquote }} >> /root/.ssh/authorized_keys
         echo $(date) ": ensure swm worker is installed via ssh"
 
         local check_interval=15
@@ -31,10 +31,10 @@ function download_swm_worker() {
 
         ${SWM_ROOT}/${SWM_VERSION}/scripts/setup.linux -p ${SWM_ROOT} -c ${SWM_ROOT}/${SWM_VERSION}/priv/setup/setup-config.linux
 
-    elif [[ "{{ swm_source }}" == "http://*.tar.gz" ]]; then
+    elif [[ {{ swm_source | shellquote }} == "http://*.tar.gz" ]]; then
         TMP_DIR=$(mktemp -d -t swm-worker-XXXXX)
         pushd $TMP_DIR
-        wget {{ swm_source }} --output-document=swm-worker.tar.gz
+        wget {{ swm_source | shellquote }} --output-document=swm-worker.tar.gz
         mkdir -p /opt/swm
         tar zfx ./swm-worker.tar.gz --directory /opt/swm/
         popd
@@ -49,7 +49,7 @@ function download_swm_worker() {
     # Runs on every job node. Expose spool paths under /var/log.
     local domain="${HOST_NAME}.openworkload.org"
     local swm_log_dir="/opt/swm/spool/${HOST_NAME}@${domain}/log"
-    local job_dir="/opt/swm/spool/job/{{ job_id }}"
+    local job_dir=/opt/swm/spool/job/{{ job_id | shellquote }}
     echo "$(date): ensure directories $swm_log_dir and $job_dir"
     mkdir -p "$swm_log_dir" "$job_dir"
     echo "$(date): link /var/log/swm -> $swm_log_dir"
@@ -163,8 +163,8 @@ EOF
 }
 
 function pull_container_image() {
-    echo $(date) ": pull job container image: '{{ container_image }}'"
-    podman pull {{ container_image }}
+    echo $(date) ": pull job container image: {{ container_image | shellquote }}"
+    podman pull {{ container_image | shellquote }}
 
     echo $(date) ": local podman images after pull:"
     podman images

@@ -29,7 +29,7 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
 
     def _render_cloud_init_script(self, install_checkpoint_tools: bool = False):
         return self.connector._get_cloud_init_script(
-            job_id="job-1",
+            job_id="40565124-9c03-11ee-8ca4-a3132f7ae2fb",
             container_image="registry.example.org/image:tag",
             container_registry="registry.example.org",
             container_registry_username="user",
@@ -87,7 +87,7 @@ class TestAzureConnectorCustomDataInjection(unittest.TestCase):
         self.assertNotIn("getent hosts", cloud_init_script)
         self.assertIn("setup_log_symlinks", cloud_init_script)
         self.assertIn('local swm_log_dir="/opt/swm/spool/${HOST_NAME}@${domain}/log"', cloud_init_script)
-        self.assertIn('local job_dir="/opt/swm/spool/job/job-1"', cloud_init_script)
+        self.assertIn("local job_dir=/opt/swm/spool/job/40565124-9c03-11ee-8ca4-a3132f7ae2fb", cloud_init_script)
         self.assertIn('ln -s "$swm_log_dir" /var/log/swm', cloud_init_script)
         self.assertIn('ln -s "$job_dir" /var/log/job', cloud_init_script)
         self.assertIn("install_mana_dmtcp", cloud_init_script)

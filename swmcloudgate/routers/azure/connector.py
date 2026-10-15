@@ -18,6 +18,7 @@ from azure.mgmt.resource.resources.models import DeploymentMode, DeploymentExten
 
 from swmcloudgate import cache
 from swmcloudgate.azure_cert import AzureCertificateError, load_azure_certificate_data
+from swmcloudgate.validation import assert_job_id
 
 from ..baseconnector import BaseConnector
 
@@ -833,6 +834,7 @@ class AzureConnector(BaseConnector):
         nsg_source_address_prefixes: list[str] | None = None,
         allow_ssh_from_internet: bool = False,
     ) -> tuple[DeploymentExtended, str]:
+        job_id = assert_job_id(job_id)
         assert_registry_credentials_safe(
             container_image,
             container_registry_server,

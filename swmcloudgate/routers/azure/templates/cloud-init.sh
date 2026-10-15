@@ -244,7 +244,7 @@ setup_log_symlinks() {
     # expose convenient locations under /var/log.
     local domain="${HOST_NAME}.openworkload.org"
     local swm_log_dir="/opt/swm/spool/${HOST_NAME}@${domain}/log"
-    local job_dir="/opt/swm/spool/job/{{ job_id }}"
+    local job_dir=/opt/swm/spool/job/{{ job_id | shellquote }}
 
     echo "$(date): ensure directories $swm_log_dir and $job_dir"
     mkdir -p "$swm_log_dir" "$job_dir"

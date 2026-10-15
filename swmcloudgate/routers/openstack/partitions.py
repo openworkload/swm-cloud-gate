@@ -38,18 +38,21 @@ async def create_partition(
         connector = _connector(username, password, "orchestration")
     except OpenStackAuthError as e:
         raise HTTPException(status_code=http.client.UNAUTHORIZED, detail=str(e)) from e
-    result = connector.create_stack(
-        tenantname,
-        partname,
-        vmimage,
-        flavorname,
-        keyname,
-        count,
-        jobid,
-        runtime,
-        ports,
-        containerimage,
-    )
+    try:
+        result = connector.create_stack(
+            tenantname,
+            partname,
+            vmimage,
+            flavorname,
+            keyname,
+            count,
+            jobid,
+            runtime,
+            ports,
+            containerimage,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=http.HTTPStatus.BAD_REQUEST, detail=str(e)) from e
     LOG.info(f"Create OpenStack partition {partname} for tenant {tenantname}, job id: {jobid}")
     LOG.debug(f"Partition {partname} creation options:")
     LOG.debug(f" * username: {username}")

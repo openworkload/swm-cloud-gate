@@ -1,4 +1,4 @@
-stack_name: {{ stack_name }}
+stack_name: {{ stack_name | yamls }}
 disable_rollback: true
 
 template:
@@ -11,21 +11,21 @@ template:
       type: string
       label: VM image
       description: Name or ID of image to use for the instance
-      default: {{ image_name }}
+      default: {{ image_name | yamls }}
       constraints:
         - custom_constraint: glance.image
     flavor:
       type: string
       label: VM flavor
       description: Name of flavor to use for the instance
-      default: {{ flavor_name }}
+      default: {{ flavor_name | yamls }}
       constraints:
       - custom_constraint: nova.flavor
     key_name:
       type: string
       label: Key name
       description: Name of key pair to use for the server
-      default: {{ key_name }}
+      default: {{ key_name | yamls }}
       constraints:
         - custom_constraint: nova.keypair
     public_net:
