@@ -9,6 +9,7 @@ from swmcloudgate.routers.azure.connector import (
     AzureConnector,
     image_registry_host,
     assert_registry_credentials_safe,
+    assert_managed_resource_group_name,
     parse_and_validate_ports,
     resolve_nsg_source_prefixes,
 )
@@ -584,3 +585,31 @@ class TestNsgPortValidation(unittest.TestCase):
             )
         self.assertIn("nsg_source_address_prefixes", str(ctx.exception))
         connector._resource_client.resource_groups.create_or_update.assert_not_called()
+
+
+class TestManagedResourceGroupDelete(unittest.TestCase):
+    def test_assert_managed_resource_group_name_allows_scheme(self):
+        assert_managed_resource_group_name("swm-3579a076-resource-group")
+
+    def test_assert_managed_resource_group_name_rejects_foreign(self):
+        for bad in ("production", "swmStorage", "foo-resource-group", "swm-only", ""):
+            with self.assertRaises(ValueError):
+                assert_managed_resource_group_name(bad)
+
+    def test_delete_resource_group_rejects_before_azure_call(self):
+        connector = AzureConnector()
+        connector._test_responses = {}
+        connector._resource_client = Mock()
+        with self.assertRaises(ValueError) as ctx:
+            connector.delete_resource_group("production")
+        self.assertIn("resource group name must start with", str(ctx.exception))
+        connector._resource_client.resource_groups.begin_delete.assert_not_called()
+
+    def test_delete_resource_group_allows_managed_name(self):
+        connector = AzureConnector()
+        connector._test_responses = {}
+        connector._resource_client = Mock()
+        connector._resource_client.resource_groups.begin_delete.return_value = Mock()
+        result = connector.delete_resource_group("swm-3579a076-resource-group")
+        self.assertEqual(result, "Deletion started")
+        connector._resource_client.resource_groups.begin_delete.assert_called_once_with("swm-3579a076-resource-group")

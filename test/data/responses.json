@@ -46,12 +46,12 @@
       ],
       "resource_groups": [
         {
-          "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg1-resource-group",
-          "name": "rg1",
+          "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/swm-rg1test1-resource-group",
+          "name": "swm-rg1test1-resource-group",
           "resources": [
             {
               "type": "Microsoft.Network/publicIPAddresses",
-              "name": "rg1-PublicIP",
+              "name": "swm-rg1test1-PublicIP",
               "properties": {
                 "ipAddress": "20.1.2.3",
                 "provisioningState": "Succeeded"
@@ -59,7 +59,7 @@
             },
             {
               "type": "Microsoft.Network/networkInterfaces",
-              "name": "rg1-compute2-NetInt",
+              "name": "swm-rg1test1-compute2-NetInt",
               "properties": {
                 "provisioningState": "Succeeded",
                 "ipConfigurations": [
@@ -73,7 +73,7 @@
             },
             {
               "type": "Microsoft.Network/networkInterfaces",
-              "name": "rg1-NetInt",
+              "name": "swm-rg1test1-NetInt",
               "properties": {
                 "provisioningState": "Succeeded",
                 "ipConfigurations": [
@@ -87,7 +87,7 @@
             },
             {
               "type": "Microsoft.Network/networkInterfaces",
-              "name": "rg1-compute1-NetInt",
+              "name": "swm-rg1test1-compute1-NetInt",
               "properties": {
                 "provisioningState": "Succeeded",
                 "ipConfigurations": [
@@ -102,8 +102,8 @@
           ]
         },
         {
-          "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg2-resource-group",
-          "name": "rg2",
+          "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/swm-rg2test2-resource-group",
+          "name": "swm-rg2test2-resource-group",
           "resources": []
         }
       ]

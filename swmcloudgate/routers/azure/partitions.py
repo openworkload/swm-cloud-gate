@@ -220,9 +220,10 @@ async def get_partition_by_id(
             LOG.warning(msg)
             return {"error": msg}
 
+        resource_group_name = f"{partitionname}-resource-group"
         CONNECTOR.reinitialize(subscriptionid, tenant_id, app_id)
-        if result := CONNECTOR.get_resource_group(partitionname):
-            return convert_to_partition(result, partitionname)
+        if result := CONNECTOR.get_resource_group(resource_group_name):
+            return convert_to_partition(result, resource_group_name)
 
     except Exception as e:
         LOG.error(traceback.format_exception(e))
@@ -265,7 +266,7 @@ async def get_partition_by_name(
 
         resource_group_name = partitionname + "-resource-group"
         if result := CONNECTOR.get_resource_group(resource_group_name):
-            return convert_to_partition(result, partitionname)
+            return convert_to_partition(result, resource_group_name)
 
     except Exception as e:
         LOG.error(traceback.format_exception(e))
@@ -299,6 +300,9 @@ async def delete_partition(
         CONNECTOR.reinitialize(subscriptionid, tenant_id, app_id)
         if result := CONNECTOR.delete_resource_group(resourcegroup):
             return {"result": result}
+
+    except ValueError as e:
+        raise HTTPException(status_code=http.HTTPStatus.BAD_REQUEST, detail=str(e)) from e
 
     except Exception as e:
         LOG.error(traceback.format_exception(e))

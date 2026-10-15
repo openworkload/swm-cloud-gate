@@ -61,6 +61,16 @@ az login
 az ad sp create-for-rbac --name swmSP --role Contributor --scopes /subscriptions/$SUBSCRIPTION_ID --cert @/opt/swm/spool/secure/node/cert.pem
 ```
 
+Subscription-wide Contributor is convenient for labs but is excessive in
+production. Prefer a dedicated subscription or management group, or a custom
+role limited to managed partition resource groups (`swm-*-resource-group`).
+Keep long-lived storage and ACR resource groups outside that pattern (for
+example `swmStorage`).
+
+The gate rejects DELETE for resource group names that do not match
+`swm-*-resource-group` (HTTP 400). Narrow IAM still reduces blast radius if the
+gate is misused or a bug bypasses that check.
+
 ### Get the service principal application id:
 ```bash
 az ad sp list --display-name swmSP --query "[].appId" --output tsv

@@ -76,6 +76,13 @@ applies `allowed_ports` when that list is non-empty. Invalid ports return HTTP
 This NSG control is separate from swm-core `submission_address_allowlist`, which
 limits TCP proxy upstream targets on the Sky Port side.
 
+## Azure partition DELETE scope
+
+Partition DELETE accepts only resource group names that start with `swm-` and
+end with `-resource-group` (the create naming scheme). Other names return HTTP
+400 and Azure delete is not called. Narrow the service principal scope in Azure
+as well; see [AZURE.md](AZURE.md).
+
 ## OpenStack credentials and TLS
 
 Set `providers.openstack` in `~/.swm/cloud-gate.yaml`:

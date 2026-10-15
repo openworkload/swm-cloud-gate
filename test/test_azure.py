@@ -118,10 +118,13 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
                         "compute_instances_ips": ["10.0.0.7", "10.0.0.8"],
                         "created": None,
                         "description": None,
-                        "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg1-resource-group",
+                        "id": (
+                            "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75"
+                            "/resourceGroups/swm-rg1test1-resource-group"
+                        ),
                         "master_private_ip": "10.0.0.4",
                         "master_public_ip": "20.1.2.3",
-                        "name": "rg1",
+                        "name": "swm-rg1test1-resource-group",
                         "status": "succeeded",
                         "updated": None,
                     },
@@ -129,10 +132,13 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
                         "compute_instances_ips": [],
                         "created": None,
                         "description": None,
-                        "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg2-resource-group",
+                        "id": (
+                            "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75"
+                            "/resourceGroups/swm-rg2test2-resource-group"
+                        ),
                         "master_private_ip": "",
                         "master_public_ip": "",
-                        "name": "rg2",
+                        "name": "swm-rg2test2-resource-group",
                         "status": None,
                         "updated": None,
                     },
@@ -185,7 +191,7 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
             async with session.get(
                 url=(
                     f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
-                    "/resourceGroups/rg1-resource-group"
+                    "/resourceGroups/swm-rg1test1-resource-group"
                 ),
             ) as resp:
                 try:
@@ -198,10 +204,12 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
                 "compute_instances_ips": ["10.0.0.7", "10.0.0.8"],
                 "created": None,
                 "description": None,
-                "id": "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75/resourceGroups/rg1-resource-group",
+                "id": (
+                    "/subscriptions/3f2fc2c5-8446-4cd5-af2f-a6af7f85ea75" "/resourceGroups/swm-rg1test1-resource-group"
+                ),
                 "master_private_ip": "10.0.0.4",
                 "master_public_ip": "20.1.2.3",
-                "name": "rg1",
+                "name": "swm-rg1test1-resource-group",
                 "status": "succeeded",
                 "updated": None,
             },
@@ -271,7 +279,10 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
     async def test_delete_partition_existed(self):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.delete(
-                url=f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo/resourceGroups/rg1",
+                url=(
+                    f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
+                    "/resourceGroups/swm-rg1test1-resource-group"
+                ),
             ) as resp:
                 try:
                     data = await resp.json()
@@ -282,13 +293,31 @@ class TestAzureGate(unittest.IsolatedAsyncioTestCase):
     async def test_delete_partition_absent(self):
         async with aiohttp.ClientSession(headers=self._default_headers) as session:
             async with session.delete(
-                url=f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo/resourceGroups/bar",
+                url=(
+                    f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
+                    "/resourceGroups/swm-missing-resource-group"
+                ),
             ) as resp:
                 try:
                     data = await resp.json()
                 except aiohttp.client_exceptions.ContentTypeError:
                     data = await resp.text()
         self.assertEqual(data, {"detail": "Cannot delete partition"})
+
+    async def test_delete_partition_rejects_unmanaged_name(self):
+        async with aiohttp.ClientSession(headers=self._default_headers) as session:
+            async with session.delete(
+                url=(
+                    f"http://{self._hostname}:{self._port}/azure/partitions//subscriptions/foo"
+                    "/resourceGroups/production"
+                ),
+            ) as resp:
+                try:
+                    data = await resp.json()
+                except aiohttp.client_exceptions.ContentTypeError:
+                    data = await resp.text()
+        self.assertEqual(resp.status, 400)
+        self.assertIn("resource group name must start with", data.get("detail", ""))
 
     async def test_create_partition(self):
         headers = {

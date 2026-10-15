@@ -77,6 +77,18 @@ def assert_registry_credentials_safe(
         )
 
 
+RESOURCE_GROUP_SUFFIX = "-resource-group"
+
+
+def assert_managed_resource_group_name(name: str, prefix: str = "swm-") -> None:
+    """Reject resource group names outside the managed swm-*-resource-group scheme."""
+    rg = (name or "").strip()
+    if not rg.startswith(prefix) or not rg.endswith(RESOURCE_GROUP_SUFFIX):
+        raise ValueError(
+            f"resource group name must start with {prefix!r} and end with {RESOURCE_GROUP_SUFFIX!r} (got {name!r})"
+        )
+
+
 def parse_and_validate_ports(
     ports: str | None,
     allowed_ports: list[int] | None = None,
@@ -906,6 +918,7 @@ class AzureConnector(BaseConnector):
             raise
 
     def delete_resource_group(self, resource_group_name: str) -> str | None:
+        assert_managed_resource_group_name(resource_group_name, self._get_resource_prefix())
         if "resource_groups" in self._test_responses:
             for it in self.list_resource_groups():
                 if it["name"] == resource_group_name:
